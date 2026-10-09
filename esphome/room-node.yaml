@@ -1,0 +1,101 @@
+# Vagus room node: ESP32 + LED (stand-in for a room light) + temp/humidity + light level.
+#
+# Flash over USB the first time:   esphome run esphome/room-node.yaml
+# Then control it from a browser:  http://<device-ip>/
+# Or from the laptop:              python tools/esp_test.py <device-ip>
+#
+# Wiring (ESP32 DevKit V1, 30-pin):
+#   Temp/humidity module (DHT11):  +/VCC -> 3V3   -/GND -> GND   S/OUT/DATA -> D4  (GPIO4)
+#   Light sensor (LM393 LDR module): VCC -> 3V3   GND -> GND     DO -> D18 (GPIO18)   AO -> not connected
+#   (Sensors share 3V3/GND through the breadboard rails: 3V3 -> + rail, GND -> - rail.)
+#   LED: D25 (GPIO25) -> 220-330 ohm resistor -> LED long leg; LED short leg -> GND
+#   Board LED (GPIO2) is already on the ESP32, so it works with nothing wired.
+
+substitutions:
+  # ESP-IDF can't build inside a folder whose path has spaces ("New Folder", "Graph hack"),
+  # so build files go in your user folder (C:\Users\<you>\esphome-build) instead.
+  build_root: !env_var USERPROFILE .
+
+esphome:
+  name: vagus-room
+  friendly_name: Vagus Room
+  build_path: ${build_root}/esphome-build/vagus-room
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  # If it can't join your Wi-Fi it starts its own hotspot, so you can fix the settings from a phone.
+  ap:
+    ssid: "Vagus Room Fallback"
+    password: !secret fallback_password
+
+captive_portal:
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+# Local web page + REST API that the laptop (and later the agent) calls. No Home Assistant needed.
+web_server:
+  port: 80
+  version: 3
+
+# Restart from the web page, e.g. after rewiring a sensor.
+button:
+  - platform: restart
+    name: "Restart"
+
+sensor:
+  # DHT11 (blue). Use DHT22 here if you swap in the white, more accurate one.
+  - platform: dht
+    pin: GPIO4
+    model: DHT11
+    temperature:
+      name: "Room Temperature"
+    humidity:
+      name: "Room Humidity"
+    update_interval: 10s
+
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 60s
+
+binary_sensor:
+  # LDR module's DO pin: bright/dark, switching at the level set by the module's screw.
+  # Its AO pin would give a %, but needs an ADC1 pin (GPIO32-39), and on this breadboard
+  # those are on the ESP32 side with no free holes.
+  - platform: gpio
+    pin:
+      number: GPIO18
+      inverted: true   # DO goes low when it's brighter than the threshold
+    name: "Room Bright"
+    device_class: light
+    filters:
+      - delayed_on_off: 500ms   # ignore flicker right at the threshold
+
+output:
+  - platform: ledc
+    pin: GPIO25
+    id: demo_led_pwm
+  - platform: gpio
+    pin:
+      number: GPIO2
+      ignore_strapping_warning: true   # the board's own LED is wired here; nothing else to attach
+    id: board_led_out
+
+light:
+  # The external LED: dimmable, so it can stand in for "warm dim" vs "bright" lighting.
+  - platform: monochromatic
+    name: "Demo Light"
+    output: demo_led_pwm
+    default_transition_length: 0.5s
+  - platform: binary
+    name: "Board LED"
+    output: board_led_out
