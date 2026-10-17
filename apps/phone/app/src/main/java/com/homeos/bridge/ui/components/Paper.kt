@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
@@ -29,7 +30,9 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
@@ -71,6 +74,13 @@ fun PaperBlock(
     shape: Shape = HomeOsShapes.block,
     padding: PaddingValues = PaddingValues(HomeOsDims.blockPadding),
     reverse: Boolean = false,
+    /** Overrides the paper fill. Used for a selected state, as a light tint of the plate's hue. */
+    fill: Color? = null,
+    /**
+     * Stretches the block to its parent's height. Needed for blocks sitting side by side: without
+     * it they size to their own content, and two plates at different heights read as a mistake.
+     */
+    fillHeight: Boolean = false,
     verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(6.dp),
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -131,6 +141,7 @@ fun PaperBlock(
         Column(
             Modifier
                 .plateOffset(travel)
+                .then(if (fillHeight) Modifier.fillMaxHeight() else Modifier)
                 .defaultMinSize(minHeight = if (onClick != null) HomeOsDims.minTouch else 0.dp)
                 .drawBehind {
                     if (!focused) return@drawBehind
@@ -157,7 +168,7 @@ fun PaperBlock(
                     },
                 )
                 .border(HomeOsDims.border, colors.border, shape)
-                .background(colors.paper, shape)
+                .background(fill ?: colors.paper, shape)
                 .padding(padding),
             verticalArrangement = verticalArrangement,
             content = content,
@@ -182,6 +193,11 @@ private fun Modifier.plateOffset(amount: Dp) = layout { measurable, constraints 
  * A chip: the Check in screen's unit of interaction, and the smallest thing that still gets a
  * plate. 48dp minimum height, because the reference neobrutalism library's 40px control would fail
  * Android's touch-target floor.
+ *
+ * The plate is always there, because the plate is what makes a block look pressable — a chip
+ * without one is just a bordered rectangle, and Check in is the screen where the press matters
+ * most. Selection is carried by a tint of the plate's own hue plus a filled icon, so it reads
+ * without relying on the shadow being absent.
  */
 @Composable
 fun ChipBlock(
@@ -195,10 +211,12 @@ fun ChipBlock(
     val colors = HomeOs.colors
     PaperBlock(
         modifier = modifier,
-        plate = if (selected) plate else Plate.None,
+        plate = plate,
         onClick = onClick,
         shape = HomeOsShapes.chip,
         padding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+        // A 14% wash of the plate hue over paper. Ink still measures well above 4.5:1 on it.
+        fill = if (selected) plate.ink(colors).copy(alpha = 0.14f).compositeOver(colors.paper) else null,
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,

@@ -2,6 +2,7 @@ package com.homeos.bridge.ui.home
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -28,9 +28,10 @@ import com.homeos.bridge.theme.HomeOsDims
 import com.homeos.bridge.theme.Plate
 import com.homeos.bridge.theme.ink
 import com.homeos.bridge.ui.components.AblationBanner
+import com.homeos.bridge.ui.components.AppliancePanel
 import com.homeos.bridge.ui.components.Baseline
 import com.homeos.bridge.ui.components.PaperBlock
-import com.homeos.bridge.ui.components.PersonBadge
+import com.homeos.bridge.ui.components.PersonAvatar
 import com.homeos.bridge.ui.components.SectionHeader
 import com.homeos.bridge.ui.components.Sparkline
 import com.homeos.bridge.ui.components.StatReadout
@@ -47,12 +48,12 @@ private val DEEP_MINUTES = Regex("""(\d+)\s*min deep""")
  *
  * Two rules shape this screen. There are **no charts** here beyond sparklines — anything needing an
  * axis lives one tap deeper, following the three-tier hierarchy that data-dense health apps settle
- * on. And **no number appears bare**: every readout carries the band of what is usual for *this
- * person*, because that is exactly how the backend computes meaning, and a figure without it would
- * be less honest than the data behind it.
+ * on. And **no number appears bare**: every readout carries the band of what is usual for *this*
+ * person, because that is exactly how the backend computes meaning.
  *
- * The blocks are deliberately unequal. A uniform grid of identical cards is the single clearest
- * sign that nobody decided what mattered.
+ * The blocks are deliberately unequal in width, but side-by-side blocks are forced to equal
+ * *height* through `IntrinsicSize.Min`, so their plates line up. Two hard offsets at different
+ * depths is the fastest way to make a careful layout look careless.
  */
 @Composable
 fun HomeScreen(
@@ -61,6 +62,8 @@ fun HomeScreen(
     contentPadding: PaddingValues,
     onWhy: (Decision) -> Unit,
     onOpenMemory: () -> Unit,
+    onOpenDevice: (Device) -> Unit,
+    onAddAppliance: () -> Unit,
     onAnswerPrompt: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -71,20 +74,21 @@ fun HomeScreen(
     val hrBaseline = state.context?.baseline("hr") ?: state.context?.baseline("hr_rest")
     val rmssd = state.myBody?.rmssd
     val rmssdBaseline = state.context?.baseline("rmssd")
+    // Horizontal insets live on the items, not on the list, so the appliance strip can run
+    // edge to edge while everything else stays on the margin.
+    val gutter = Modifier.padding(horizontal = HomeOsDims.screenMargin)
 
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(
-            start = HomeOsDims.screenMargin,
-            end = HomeOsDims.screenMargin,
             top = contentPadding.calculateTopPadding() + 12.dp,
-            bottom = contentPadding.calculateBottomPadding() + 24.dp,
+            bottom = contentPadding.calculateBottomPadding(),
         ),
         verticalArrangement = Arrangement.spacedBy(HomeOsDims.gutter),
     ) {
         state.prompt?.let { prompt ->
             item(key = "prompt") {
-                PaperBlock(plate = Plate.Attention) {
+                PaperBlock(modifier = gutter, plate = Plate.Attention) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(
                             HomeOsIcons.bolt,
@@ -118,12 +122,12 @@ fun HomeScreen(
         }
 
         if (!state.home.graphEnabled) {
-            item(key = "ablation") { AblationBanner() }
+            item(key = "ablation") { AblationBanner(gutter) }
         }
 
-        if (!state.reachable) {
+        if (state.offline) {
             item(key = "offline") {
-                PaperBlock(plate = Plate.Failure) {
+                PaperBlock(modifier = gutter, plate = Plate.Failure) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Icon(
                             HomeOsIcons.cloudOff,
@@ -147,6 +151,7 @@ fun HomeScreen(
         // The hero. One number leads the screen, at display size, with its band underneath.
         item(key = "body") {
             PaperBlock(
+                modifier = gutter,
                 plate = Plate.Body,
                 padding = PaddingValues(HomeOsDims.heroPadding),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -170,16 +175,24 @@ fun HomeScreen(
             }
         }
 
-        // Two unequal-weight companions. Sleep gets more room than HRV because it has more to say.
+        // Unequal widths, equal heights, so the two plates sit on the same line.
         item(key = "night-and-hrv") {
-            Row(horizontalArrangement = Arrangement.spacedBy(HomeOsDims.gutter)) {
-                PaperBlock(modifier = Modifier.weight(1.15f), plate = Plate.Body, onClick = onOpenMemory) {
-                    val hours = lastSleep?.summary?.let { SLEEP_HOURS.find(it)?.groupValues?.get(1) }
-                    val deep = lastSleep?.summary?.let { DEEP_MINUTES.find(it)?.groupValues?.get(1) }
+            Row(
+                gutter.height(IntrinsicSize.Min),
+                horizontalArrangement = Arrangement.spacedBy(HomeOsDims.gutter),
+            ) {
+                val hours = lastSleep?.summary?.let { SLEEP_HOURS.find(it)?.groupValues?.get(1) }
+                val deep = lastSleep?.summary?.let { DEEP_MINUTES.find(it)?.groupValues?.get(1) }
+                PaperBlock(
+                    modifier = Modifier.weight(1.15f),
+                    plate = Plate.Body,
+                    onClick = onOpenMemory,
+                    fillHeight = true,
+                ) {
                     StatReadout(
                         label = "Last night",
-                        value = hours ?: "—",
-                        unit = if (hours != null) "h" else null,
+                        value = hours ?: readoutValue(null),
+                        unit = "h",
                         icon = HomeOsIcons.bedtime,
                         plate = Plate.Body,
                         note = when {
@@ -190,7 +203,10 @@ fun HomeScreen(
                     )
                     lastSleep?.quality?.let { quality ->
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            StatusDot(on = quality == "good", onColor = if (quality == "good") colors.greenInk else colors.amberInk)
+                            StatusDot(
+                                on = quality == "good",
+                                onColor = if (quality == "good") colors.greenInk else colors.amberInk,
+                            )
                             Text(
                                 if (quality == "good") "good for you" else "worse than your usual",
                                 style = type.caption,
@@ -199,11 +215,15 @@ fun HomeScreen(
                         }
                     }
                 }
-                PaperBlock(modifier = Modifier.weight(1f), plate = Plate.Body) {
+                PaperBlock(
+                    modifier = Modifier.weight(1f),
+                    plate = Plate.Body,
+                    fillHeight = true,
+                ) {
                     StatReadout(
                         label = "HRV",
                         value = readoutValue(rmssd),
-                        unit = if (rmssd != null) "ms" else null,
+                        unit = "ms",
                         icon = HomeOsIcons.ecgHeart,
                         plate = Plate.Body,
                         current = rmssd,
@@ -218,33 +238,52 @@ fun HomeScreen(
             }
         }
 
-        item(key = "room") {
-            RoomBlock(state = state)
+        item(key = "room") { RoomBlock(state = state, modifier = gutter) }
+
+        item(key = "appliances-header") {
+            SectionHeader(
+                title = "Appliances",
+                modifier = gutter,
+                trailing = "${state.home.devices.count { it.isOn }} on",
+            )
+        }
+        item(key = "appliances") {
+            AppliancePanel(
+                devices = state.home.devices,
+                onOpenDevice = onOpenDevice,
+                onAddAppliance = onAddAppliance,
+            )
         }
 
         state.latestDecision?.let { decision ->
             item(key = "decision") {
-                DecisionBlock(decision = decision, onWhy = { onWhy(decision) })
+                DecisionBlock(decision = decision, onWhy = { onWhy(decision) }, modifier = gutter)
             }
         }
 
         item(key = "household-header") {
             SectionHeader(
                 title = "Who's in",
+                modifier = gutter,
                 trailing = "${state.home.people.count { it.present }} of ${state.home.people.size} home",
             )
         }
         item(key = "household") {
-            HouseholdStrip(people = state.home.people, me = state.alias, state = state)
+            HouseholdStrip(
+                people = state.home.people,
+                me = state.alias,
+                state = state,
+                modifier = gutter,
+            )
         }
     }
 }
 
 /**
- * The room, from the ESP32 and the virtual devices.
+ * The room itself: what the sensor reads.
  *
- * The block itself is not a button — the device rows inside it are the affordances, so tapping to
- * read does not accidentally change the house.
+ * The appliances moved out into their own scrollable strip, so this block answers one question —
+ * what is it like in here — instead of being a list with a header stapled on.
  */
 @Composable
 private fun RoomBlock(state: AppState, modifier: Modifier = Modifier) {
@@ -270,92 +309,34 @@ private fun RoomBlock(state: AppState, modifier: Modifier = Modifier) {
             )
         }
 
-        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
             Column {
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
-                        if (temperature != null) "%.1f".format(temperature) else "—",
+                        if (temperature != null) "%.1f".format(temperature) else readoutValue(null),
                         style = type.readout,
-                        color = colors.ink,
+                        color = if (temperature != null) colors.ink else colors.inkMuted.copy(alpha = 0.45f),
                     )
-                    Text(" °C", style = type.caption, color = colors.inkMuted)
+                    if (temperature != null) Text(" °C", style = type.caption, color = colors.inkMuted)
                 }
                 Text("temperature", style = type.micro, color = colors.inkMuted)
             }
             Column {
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
-                        if (humidity != null) humidity.roundToInt().toString() else "—",
+                        if (humidity != null) humidity.roundToInt().toString() else readoutValue(null),
                         style = type.readout,
-                        color = colors.ink,
+                        color = if (humidity != null) colors.ink else colors.inkMuted.copy(alpha = 0.45f),
                     )
-                    Text(" %", style = type.caption, color = colors.inkMuted)
+                    if (humidity != null) Text(" %", style = type.caption, color = colors.inkMuted)
                 }
                 Text("humidity", style = type.micro, color = colors.inkMuted)
             }
         }
 
         if (temperature == null) {
-            Text(
-                "The room sensor hasn't reported yet.",
-                style = type.caption,
-                color = colors.inkMuted,
-            )
+            Text("The room sensor hasn't reported yet.", style = type.caption, color = colors.inkMuted)
         }
-
-        Spacer(Modifier.height(2.dp))
-        state.home.devices.filter { !it.isSensor }.forEach { device ->
-            DeviceRow(device)
-        }
-    }
-}
-
-@Composable
-private fun DeviceRow(device: Device, modifier: Modifier = Modifier) {
-    val colors = HomeOs.colors
-    val type = HomeOs.type
-    val icon = when (device.kind) {
-        "ac" -> HomeOsIcons.acUnit
-        "fan" -> HomeOsIcons.modeFan
-        "light" -> HomeOsIcons.lightbulb
-        else -> HomeOsIcons.bolt
-    }
-    val value = when {
-        device.kind == "ac" && device.setpoint != null -> "${device.setpoint} °C"
-        device.kind == "fan" && device.level != null -> "level ${device.level}"
-        device.kind == "light" && device.brightness != null -> "${device.brightness}%"
-        else -> device.power ?: "—"
-    }
-
-    Row(
-        modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = if (device.isOn) colors.violetInk else colors.inkMuted,
-            modifier = Modifier.size(16.dp),
-        )
-        Text(device.name, style = type.body, color = colors.ink, modifier = Modifier.weight(1f))
-        if (device.leasedBy != null) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Icon(
-                    HomeOsIcons.lock,
-                    contentDescription = "held by ${device.leasedBy}",
-                    tint = colors.amberInk,
-                    modifier = Modifier.size(13.dp),
-                )
-                Text(device.leasedBy, style = type.micro, color = colors.amberInk)
-            }
-            Spacer(Modifier.width(6.dp))
-        }
-        Text(
-            if (device.isOn) value else "off",
-            style = type.label,
-            color = if (device.isOn) colors.ink else colors.inkMuted,
-        )
     }
 }
 
@@ -372,15 +353,12 @@ private fun DecisionBlock(decision: Decision, onWhy: () -> Unit, modifier: Modif
         }
         Text(decision.summary, style = type.blockTitle, color = colors.ink)
         if (decision.chose.isNotEmpty()) {
-            Text(
-                decision.chose.joinToString(" · "),
-                style = type.body,
-                color = colors.violetInk,
-            )
+            Text(decision.chose.joinToString(" · "), style = type.body, color = colors.violetInk)
         }
         Row(
             Modifier.fillMaxWidth().padding(top = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text("Why", style = type.label, color = colors.ink)
             Icon(
@@ -420,15 +398,18 @@ private fun HouseholdStrip(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    PersonBadge(alias = person.alias, dim = person.isDataset)
+                    PersonAvatar(
+                        alias = person.alias,
+                        size = 42.dp,
+                        present = if (person.isDataset) null else person.present,
+                        dim = person.isDataset,
+                    )
                     Column(Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(
-                                person.alias + if (person.alias == me) " (you)" else "",
-                                style = type.label,
-                                color = colors.ink,
-                            )
-                        }
+                        Text(
+                            person.alias + if (person.alias == me) " (you)" else "",
+                            style = type.blockTitle,
+                            color = colors.ink,
+                        )
                         Text(
                             when {
                                 person.isDataset -> "public dataset · never in the room"
@@ -439,19 +420,15 @@ private fun HouseholdStrip(
                             color = colors.inkMuted,
                         )
                     }
-                    if (!person.isDataset) {
-                        StatusDot(
-                            on = person.present,
-                            onColor = if (person.present) colors.greenInk else colors.inkMuted,
-                        )
-                    }
                     if (body?.hr != null) {
-                        Text(
-                            "${body.hr.roundToInt()}",
-                            style = type.label,
-                            color = Plate.Body.ink(colors),
-                        )
-                        Text("bpm", style = type.micro, color = colors.inkMuted)
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                "${body.hr.roundToInt()}",
+                                style = type.readout,
+                                color = Plate.Body.ink(colors),
+                            )
+                            Text("bpm", style = type.micro, color = colors.inkMuted)
+                        }
                     }
                 }
             }

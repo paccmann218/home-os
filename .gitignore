@@ -11,7 +11,7 @@ build/
 .gradle/
 local.properties
 *.apk
-data/
+/data/
 replay/recordings/*.tmp
 scratch-*.log
 backend/scratch/

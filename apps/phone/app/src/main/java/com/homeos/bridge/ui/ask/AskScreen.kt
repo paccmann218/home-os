@@ -1,5 +1,8 @@
 package com.homeos.bridge.ui.ask
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,18 +11,21 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -30,6 +36,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.homeos.bridge.theme.HomeOs
@@ -88,10 +96,12 @@ fun AskScreen(
         if (turns.isNotEmpty()) listState.animateScrollToItem(turns.size)
     }
 
-    Box(modifier.fillMaxWidth()) {
+    // fillMaxSize, not fillMaxWidth: the composer is aligned to this Box's bottom, and a Box that
+    // wraps its content leaves it floating wherever the conversation happens to end.
+    Box(modifier.fillMaxSize()) {
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 start = HomeOsDims.screenMargin,
                 end = HomeOsDims.screenMargin,
@@ -119,10 +129,10 @@ fun AskScreen(
                     ) {
                         STARTERS.forEach { starter ->
                             PaperBlock(
-                                plate = Plate.None,
+                                plate = Plate.Home,
                                 shape = HomeOsShapes.chip,
                                 onClick = { onAsk(starter) },
-                                padding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                                padding = PaddingValues(horizontal = 14.dp, vertical = 11.dp),
                             ) {
                                 Text(starter, style = type.label, color = colors.ink)
                             }
@@ -146,53 +156,70 @@ fun AskScreen(
             }
         }
 
+        // A composer built from the design's own parts rather than a stock Material field: a glass
+        // pill with a hard rim, and the send control as a plated circle so it presses like every
+        // other block in the app.
+        val canSend = draft.isNotBlank() && !pending
+        val send = {
+            if (draft.isNotBlank()) {
+                onAsk(draft.trim())
+                draft = ""
+            }
+        }
+
         GlassSurface(
-            level = GlassLevel.Chrome,
-            shape = HomeOsShapes.block,
+            level = GlassLevel.Dock,
+            shape = HomeOsShapes.pill,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(
                     start = HomeOsDims.screenMargin,
                     end = HomeOsDims.screenMargin,
-                    bottom = contentPadding.calculateBottomPadding() + 10.dp,
+                    bottom = contentPadding.calculateBottomPadding() + 8.dp,
                 )
                 .fillMaxWidth(),
         ) {
             Row(
-                Modifier.fillMaxWidth().padding(start = 6.dp, end = 4.dp),
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp)
+                    .padding(start = 20.dp, end = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                OutlinedTextField(
-                    value = draft,
-                    onValueChange = { draft = it },
-                    placeholder = { Text("Ask anything", style = type.body, color = colors.onShellMuted) },
-                    textStyle = type.body,
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(
-                        onSend = {
-                            if (draft.isNotBlank()) {
-                                onAsk(draft.trim())
-                                draft = ""
-                            }
-                        },
-                    ),
-                )
-                IconButton(
-                    onClick = {
-                        if (draft.isNotBlank()) {
-                            onAsk(draft.trim())
-                            draft = ""
-                        }
-                    },
-                    enabled = draft.isNotBlank() && !pending,
+                Box(Modifier.weight(1f)) {
+                    if (draft.isEmpty()) {
+                        Text("Ask anything", style = type.body, color = colors.onShellMuted)
+                    }
+                    BasicTextField(
+                        value = draft,
+                        onValueChange = { draft = it },
+                        textStyle = type.body.copy(color = colors.onShell),
+                        cursorBrush = SolidColor(colors.teal),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                        keyboardActions = KeyboardActions(onSend = { send() }),
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(if (canSend) colors.teal else colors.onShell.copy(alpha = 0.12f))
+                        .border(
+                            HomeOsDims.border,
+                            if (canSend) colors.border else colors.onShell.copy(alpha = 0.18f),
+                            CircleShape,
+                        )
+                        .clickable(enabled = canSend, onClick = send),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         HomeOsIcons.arrowOutward,
                         contentDescription = "Send",
-                        tint = if (draft.isNotBlank()) colors.teal else colors.onShellMuted,
-                        modifier = Modifier.size(20.dp),
+                        tint = if (canSend) colors.shell else colors.onShellMuted,
+                        modifier = Modifier.size(19.dp),
                     )
                 }
             }

@@ -127,9 +127,15 @@ fun CheckInScreen(
 
         item(key = "active") {
             if (active.isEmpty()) {
-                PaperBlock(plate = Plate.None) {
+                PaperBlock(plate = if (state.offline) Plate.Failure else Plate.None) {
                     Text(
-                        "The home believes nothing about you right now.",
+                        // Not knowing and knowing-there-is-nothing are different claims, and only
+                        // one of them is true when the home is unreachable.
+                        if (state.offline) {
+                            "Can't reach the home, so what it believes about you is unknown."
+                        } else {
+                            "The home believes nothing about you right now."
+                        },
                         style = type.body,
                         color = colors.inkMuted,
                     )

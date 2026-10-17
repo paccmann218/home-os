@@ -8,11 +8,19 @@ labels and the large readouts.
 
 | File | Family | Licence | Source |
 |---|---|---|---|
+| `fraunces_variable.ttf` | Fraunces (axes `opsz` 9–144, `wght` 100–900, `SOFT`, `WONK`) | SIL Open Font License 1.1 | [google/fonts `ofl/fraunces`](https://github.com/google/fonts/tree/main/ofl/fraunces) |
 | `inter_variable.ttf` | Inter v4 (axes `opsz` 14–32, `wght` 100–900) | SIL Open Font License 1.1 | [google/fonts `ofl/inter`](https://github.com/google/fonts/tree/main/ofl/inter) |
 | `jetbrains_mono_variable.ttf` | JetBrains Mono (axis `wght` 100–800) | SIL Open Font License 1.1 | [google/fonts `ofl/jetbrainsmono`](https://github.com/google/fonts/tree/main/ofl/jetbrainsmono) |
 
-The OFL permits bundling and redistribution in an application. Neither font is modified, and
-neither is renamed, so no Reserved Font Name restriction applies.
+The OFL permits bundling and redistribution in an application. None of the fonts is modified or
+renamed, so no Reserved Font Name restriction applies.
+
+**How the three are used.** Fraunces is the display voice: the wordmark, section headings, block
+titles, avatar monograms and the large readouts. Its optical-size axis is the reason it was chosen
+over a single-master display serif — the same family is set at 46sp and at 17sp and stays optically
+correct either way. Inter carries body text, labels, captions and **all inline numbers**, because
+Fraunces has no tabular-figure feature and a live value set in it would shift width as it ticks.
+JetBrains Mono appears only in dev mode and on graph identifiers.
 
 ## Icons
 
