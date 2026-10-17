@@ -1,4 +1,4 @@
-# Vagus room node: ESP32 + LED (stand-in for a room light) + temp/humidity + light level.
+# HomeOS room node: ESP32 + LED (stand-in for a room light) + temp/humidity + light level.
 #
 # Flash over USB the first time:   esphome run esphome/room-node.yaml
 # Then control it from a browser:  http://<device-ip>/
@@ -17,9 +17,9 @@ substitutions:
   build_root: !env_var USERPROFILE .
 
 esphome:
-  name: vagus-room
-  friendly_name: Vagus Room
-  build_path: ${build_root}/esphome-build/vagus-room
+  name: homeos-room
+  friendly_name: HomeOS Room
+  build_path: ${build_root}/esphome-build/homeos-room
 
 esp32:
   board: esp32dev
@@ -33,7 +33,7 @@ wifi:
   password: !secret wifi_password
   # If it can't join your Wi-Fi it starts its own hotspot, so you can fix the settings from a phone.
   ap:
-    ssid: "Vagus Room Fallback"
+    ssid: "HomeOS Room Fallback"
     password: !secret fallback_password
 
 captive_portal:

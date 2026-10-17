@@ -183,6 +183,7 @@ app.post(
   wrap(async () => {
     await setupAll({ reset: true });
     for (const p of config.people) await w.setPresence(p, !config.datasetPeople.includes(p));
+    await loadDatasetPeople();
     return { reset: true };
   }),
 );

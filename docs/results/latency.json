@@ -1,0 +1,53 @@
+{
+  "at": "2026-10-17T14:28:39.755Z",
+  "runs_per_query": 30,
+  "graph_sizes": {
+    "body:p01": {
+      "nodes": 254,
+      "edges": 1326
+    }
+  },
+  "note": "Measured from the backend's Node client to FalkorDB in Docker on a laptop, using the agents' own ACL users.",
+  "results": [
+    {
+      "query": "effective_comfort (multi-hop, harsh)",
+      "p50_ms": 6.2,
+      "p95_ms": 13.78
+    },
+    {
+      "query": "feasible_settings (multi-hop, home)",
+      "p50_ms": 5.97,
+      "p95_ms": 7.21
+    },
+    {
+      "query": "impact (algo.bfs, home)",
+      "p50_ms": 3.96,
+      "p95_ms": 4.76
+    },
+    {
+      "query": "choose_intervention (Thompson UDF, p01)",
+      "p50_ms": 6.46,
+      "p95_ms": 7.72
+    },
+    {
+      "query": "why_bad_night (algo.SPpaths, p01)",
+      "p50_ms": 4.11,
+      "p95_ms": 5.86
+    },
+    {
+      "query": "drivers (algo.pageRank, p01)",
+      "p50_ms": 3.56,
+      "p95_ms": 5.05
+    },
+    {
+      "query": "keystone (algo.betweenness, p01)",
+      "p50_ms": 5.62,
+      "p95_ms": 24.22
+    },
+    {
+      "query": "similar_episodes (vector + bands, p01)",
+      "p50_ms": 6.76,
+      "p95_ms": 8.26
+    }
+  ]
+}
