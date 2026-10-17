@@ -6,189 +6,452 @@ import android.app.NotificationManager
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationCompat
-import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import com.homeos.bridge.data.AppState
+import com.homeos.bridge.data.Decision
+import com.homeos.bridge.data.DeviceEvent
+import com.homeos.bridge.data.Episode
+import com.homeos.bridge.data.EvidenceRow
+import com.homeos.bridge.data.Explanation
+import com.homeos.bridge.data.HomeOsRepository
+import com.homeos.bridge.theme.HomeOs
+import com.homeos.bridge.theme.HomeOsDims
+import com.homeos.bridge.theme.HomeOsTheme
+import com.homeos.bridge.theme.Plate
+import com.homeos.bridge.ui.ask.AskScreen
+import com.homeos.bridge.ui.ask.Turn
+import com.homeos.bridge.ui.checkin.CheckInScreen
+import com.homeos.bridge.ui.components.Ambience
+import com.homeos.bridge.ui.components.Destination
+import com.homeos.bridge.ui.components.HomeOsBottomNav
+import com.homeos.bridge.ui.components.HomeOsSheet
+import com.homeos.bridge.ui.components.HomeOsTopBar
+import com.homeos.bridge.ui.components.PaperBlock
+import com.homeos.bridge.ui.components.PersonBadge
+import com.homeos.bridge.ui.components.Shell
+import com.homeos.bridge.ui.dev.DevScreen
+import com.homeos.bridge.ui.home.HomeScreen
+import com.homeos.bridge.ui.memory.MemoryData
+import com.homeos.bridge.ui.memory.MemoryScreen
+import com.homeos.bridge.ui.why.WhyContent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.Response
-import okhttp3.WebSocket
-import okhttp3.WebSocketListener
-import org.json.JSONObject
 import java.util.Locale
-import java.util.concurrent.TimeUnit
 
 /**
- * HomeOS Bridge: the ring wearer's phone. Syncs Gabit data from Health Connect into HomeOS,
- * and gives the same quick inputs as the watch (chips, questions) plus prompts/notifications.
+ * HomeOS Bridge.
+ *
+ * The activity owns only what has to live on the platform: permissions, text-to-speech,
+ * notifications, and the Health Connect sync. Everything about the home's state belongs to
+ * [HomeOsRepository], and everything about how it looks belongs to the screens.
  */
 class MainActivity : ComponentActivity() {
-    private val http = OkHttpClient.Builder().readTimeout(0, TimeUnit.MILLISECONDS).pingInterval(20, TimeUnit.SECONDS).build()
-    private var ws: WebSocket? = null
-    private var tts: TextToSpeech? = null
-    private val log = mutableStateOf(listOf<String>())
-    private val prompt = mutableStateOf<Pair<String, String>?>(null)
-    private lateinit var prefs: Prefs
 
-    private val hcPermissions = registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { granted ->
-        add("Health Connect: ${granted.size}/${HealthSync.PERMISSIONS.size} permissions granted")
-        if (granted.containsAll(HealthSync.PERMISSIONS - HealthSync.PERMISSIONS.filter { it.contains("BACKGROUND") }.toSet())) SyncWorker.schedule(this)
+    private lateinit var prefs: Prefs
+    private lateinit var repository: HomeOsRepository
+    private var tts: TextToSpeech? = null
+
+    private val healthPermissions = registerForActivityResult(
+        PermissionController.createRequestPermissionResultContract(),
+    ) { granted ->
+        repository.log("Health Connect: ${granted.size}/${HealthSync.PERMISSIONS.size} permissions granted")
+        val needed = HealthSync.PERMISSIONS - HealthSync.PERMISSIONS.filter { it.contains("BACKGROUND") }.toSet()
+        if (granted.containsAll(needed)) SyncWorker.schedule(this)
     }
-    private val notifPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+
+    private val notificationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         prefs = Prefs(this)
-        tts = TextToSpeech(this) { if (it == TextToSpeech.SUCCESS) tts?.language = Locale("en", "IN") }
-        getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel("homeos", "HomeOS", NotificationManager.IMPORTANCE_HIGH))
-        notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-        connect()
+        repository = HomeOsRepository(prefs, lifecycleScope)
+
+        tts = TextToSpeech(this) { status ->
+            if (status == TextToSpeech.SUCCESS) tts?.language = Locale("en", "IN")
+        }
+        getSystemService(NotificationManager::class.java).createNotificationChannel(
+            NotificationChannel("homeos", "HomeOS", NotificationManager.IMPORTANCE_HIGH),
+        )
+        notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+
+        repository.start()
         if (HealthSync.available(this)) {
-            hcPermissions.launch(HealthSync.PERMISSIONS)
+            healthPermissions.launch(HealthSync.PERMISSIONS)
             SyncWorker.schedule(this)
-        } else add("Health Connect not available on this phone")
-        setContent { MaterialTheme(colorScheme = darkColorScheme()) { Screen() } }
-    }
+        } else {
+            repository.log("Health Connect not available on this phone")
+        }
 
-    private fun add(line: String) {
-        log.value = (listOf(line) + log.value).take(40)
-    }
-
-    private fun connect() {
-        val wsUrl = prefs.url.replaceFirst("http", "ws") + "/ws/device?alias=${prefs.alias}&kind=phone"
-        ws?.close(1000, null)
-        ws = http.newWebSocket(Request.Builder().url(wsUrl).build(), object : WebSocketListener() {
-            override fun onOpen(webSocket: WebSocket, response: Response) = runOnUiThread { add("Connected to HomeOS as ${prefs.alias}") }
-            override fun onMessage(webSocket: WebSocket, text: String) {
-                val j = JSONObject(text)
-                runOnUiThread {
-                    when (j.optString("type")) {
-                        "say" -> {
-                            add("HomeOS: ${j.optString("text")}")
-                            tts?.speak(j.optString("text"), TextToSpeech.QUEUE_FLUSH, null, "homeos")
-                            notify(j.optString("text"))
-                        }
-                        "prompt" -> {
-                            prompt.value = j.optString("id") to j.optString("text")
-                            notify(j.optString("text"))
-                        }
+        // Spoken replies and prompts are the platform's job, not the repository's.
+        lifecycleScope.launch {
+            repository.spoken.collect { event ->
+                when (event) {
+                    is DeviceEvent.Say -> {
+                        tts?.speak(event.text, TextToSpeech.QUEUE_FLUSH, null, "homeos")
+                        notify(event.text)
                     }
+                    is DeviceEvent.Prompt -> notify(event.text)
+                    else -> Unit
                 }
             }
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) = runOnUiThread { add("HomeOS offline: ${t.message}") }
-        })
-    }
+        }
 
-    private fun notify(text: String) {
-        val n = NotificationCompat.Builder(this, "homeos").setSmallIcon(android.R.drawable.ic_menu_compass)
-            .setContentTitle("HomeOS").setContentText(text).setStyle(NotificationCompat.BigTextStyle().bigText(text)).setAutoCancel(true).build()
-        runCatching { getSystemService(NotificationManager::class.java).notify(text.hashCode(), n) }
-    }
-
-    private suspend fun post(path: String, body: JSONObject): String = withContext(Dispatchers.IO) {
-        val req = Request.Builder().url(prefs.url + path).post(body.toString().toRequestBody("application/json".toMediaType())).build()
-        http.newCall(req).execute().use { it.body?.string() ?: "" }
-    }
-
-    @OptIn(ExperimentalLayoutApi::class)
-    @Composable
-    private fun Screen() {
-        val scope = rememberCoroutineScope()
-        var url by remember { mutableStateOf(prefs.url) }
-        var alias by remember { mutableStateOf(prefs.alias) }
-        var question by remember { mutableStateOf("") }
-        var busy by remember { mutableStateOf(false) }
-        val lines by log
-        val p by prompt
-        Surface(Modifier.fillMaxSize(), color = Color(0xFF0B1220)) {
-            Column(Modifier.padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("HomeOS Bridge", style = MaterialTheme.typography.headlineSmall, color = Color(0xFF4FD1C5))
-                Text("Ring → Health Connect → HomeOS · last sync: ${prefs.lastSync}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(url, { url = it }, label = { Text("Server") }, modifier = Modifier.weight(2f), singleLine = true)
-                    OutlinedTextField(alias, { alias = it }, label = { Text("Person") }, modifier = Modifier.weight(1f), singleLine = true)
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton({ prefs.url = url; prefs.alias = alias; connect() }) { Text("Save") }
-                    Button(enabled = !busy, onClick = {
-                        busy = true
-                        scope.launch {
-                            val r = runCatching { withContext(Dispatchers.IO) { HealthSync.sync(this@MainActivity, prefs.url, prefs.alias, 2) } }
-                            val line = r.getOrElse { "Sync failed: ${it.message}" }; add(line); prefs.lastSync = "${java.time.LocalTime.now().withNano(0)} (manual): $line"; busy = false
-                        }
-                    }) { Text("Sync now") }
-                    OutlinedButton(enabled = !busy, onClick = {
-                        busy = true
-                        scope.launch {
-                            val r = runCatching { withContext(Dispatchers.IO) { HealthSync.sync(this@MainActivity, prefs.url, prefs.alias, 120) } }
-                            val line = r.getOrElse { "Backfill failed: ${it.message}" }; add(line); prefs.lastSync = "${java.time.LocalTime.now().withNano(0)} (backfill): $line"; busy = false
-                        }
-                    }) { Text("Backfill 120 d") }
-                }
-                if (p != null) Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text(p!!.second)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf("yes", "no").forEach { a ->
-                                Button({ scope.launch { post("/api/prompt/${prefs.alias}", JSONObject().put("id", p!!.first).put("answer", a)) }; prompt.value = null }) { Text(a) }
-                            }
-                        }
-                    }
-                }
-                Text("How are you?", color = Color.White)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("sick" to "🤒 Sick", "too_hot" to "🥵 Too hot", "too_cold" to "🥶 Too cold", "workout" to "🏃 Workout", "stressed" to "😮‍💨 Stressed",
-                        "headache" to "🤕 Headache", "sleep" to "🌙 Sleep", "period" to "🩸 Period", "fine" to "🙂 Fine", "better" to "👍 Better", "worse" to "👎 Worse").forEach { (k, l) ->
-                        OutlinedButton({ scope.launch { add("You: $l"); runCatching { post("/api/chip/${prefs.alias}", JSONObject().put("chip", k).put("source", "phone")) } } }) { Text(l) }
-                    }
-                }
-                OutlinedTextField(question, { question = it }, label = { Text("Ask HomeOS (why…? what helps me…?)") }, modifier = Modifier.fillMaxWidth())
-                Button({
-                    val q = question; question = ""
-                    scope.launch { add("You: $q"); runCatching { post("/api/ask/${prefs.alias}", JSONObject().put("text", q).put("channel", "phone")) } }
-                }) { Text("Ask") }
-                lines.forEach { Text(it, style = MaterialTheme.typography.bodySmall, color = Color(0xFFCBD5E1)) }
+        setContent {
+            HomeOsTheme {
+                BridgeApp(
+                    repository = repository,
+                    healthConnectAvailable = HealthSync.available(this),
+                    lastSync = { prefs.lastSync },
+                    serverUrl = { prefs.url },
+                    onRequestHealthPermissions = { healthPermissions.launch(HealthSync.PERMISSIONS) },
+                    onSync = ::runSync,
+                )
             }
         }
     }
 
+    private fun notify(text: String) {
+        val notification = NotificationCompat.Builder(this, "homeos")
+            .setSmallIcon(android.R.drawable.ic_menu_compass)
+            .setContentTitle("HomeOS")
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setAutoCancel(true)
+            .build()
+        runCatching {
+            getSystemService(NotificationManager::class.java).notify(text.hashCode(), notification)
+        }
+    }
+
+    /** Health Connect read plus POST, on the IO dispatcher. Returns the summary for dev mode. */
+    private suspend fun runSync(days: Long): String {
+        val result = runCatching {
+            withContext(Dispatchers.IO) {
+                HealthSync.sync(this@MainActivity, prefs.url, prefs.alias, days)
+            }
+        }
+        val summary = result.getOrElse { "Sync failed: ${it.message}" }
+        prefs.lastSync = summary
+        repository.log(summary.lineSequence().first())
+        return summary
+    }
+
     override fun onDestroy() {
-        ws?.close(1000, null)
         tts?.shutdown()
         super.onDestroy()
+    }
+}
+
+/** Which overlay, if any, is on top of the tabs. */
+private enum class Overlay { None, Dev, People, Why }
+
+@Composable
+private fun BridgeApp(
+    repository: HomeOsRepository,
+    healthConnectAvailable: Boolean,
+    lastSync: () -> String,
+    serverUrl: () -> String,
+    onRequestHealthPermissions: () -> Unit,
+    onSync: suspend (Long) -> String,
+) {
+    val state by repository.state.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+
+    var tab by remember { mutableStateOf(Destination.Home) }
+    var overlay by remember { mutableStateOf(Overlay.None) }
+    var syncing by remember { mutableStateOf(false) }
+    var syncSummary by remember { mutableStateOf(lastSync()) }
+
+    // Ask keeps its thread for the session; switching tabs should not wipe a conversation.
+    val turns = remember { mutableStateListOf<Turn>() }
+    var asking by remember { mutableStateOf(false) }
+
+    var memory by remember { mutableStateOf(MemoryData()) }
+    var lastSleep by remember { mutableStateOf<Episode?>(null) }
+
+    var why by remember { mutableStateOf<Explanation?>(null) }
+    var whyEvidence by remember { mutableStateOf<List<EvidenceRow>>(emptyList()) }
+    var whyLoading by remember { mutableStateOf(false) }
+    var whyError by remember { mutableStateOf<String?>(null) }
+
+    // The latest sleep night drives Home's "Last night" block, so it loads with the person.
+    LaunchedEffect(state.alias, state.reachable) {
+        if (state.alias.isEmpty() || !state.reachable) return@LaunchedEffect
+        repository.episodes().onSuccess { episodes ->
+            lastSleep = episodes.firstOrNull { it.kind == "sleep" }
+        }
+    }
+
+    // Memory loads when its tab is opened, and reloads when the person changes.
+    LaunchedEffect(tab, state.alias) {
+        if (tab != Destination.Memory || state.alias.isEmpty()) return@LaunchedEffect
+        memory = memory.copy(loading = true)
+        val episodes = repository.episodes().getOrDefault(emptyList())
+        val kind = episodes.firstOrNull()?.kind ?: "sleep"
+        memory = MemoryData(
+            episodes = episodes,
+            evidence = repository.evidence(kind).getOrDefault(emptyList()),
+            evidenceKind = kind,
+            drivers = repository.drivers().getOrDefault(emptyList()),
+            playbooks = listOf("sick", "recovery", "sleep")
+                .flatMap { repository.playbooks(it).getOrDefault(emptyList()) }
+                .distinctBy { it.name },
+            changes = repository.beliefDiff().getOrDefault(emptyList()),
+            stats = repository.stats().getOrDefault(emptyList()),
+            loading = false,
+        )
+    }
+
+    val openWhy: (Decision) -> Unit = { decision ->
+        overlay = Overlay.Why
+        whyLoading = true
+        whyError = null
+        why = null
+        scope.launch {
+            repository.explain(decision.id)
+                .onSuccess { explanation ->
+                    why = explanation
+                    whyEvidence = repository.evidence(explanation.episodeKind).getOrDefault(emptyList())
+                }
+                .onFailure { whyError = it.message }
+            whyLoading = false
+        }
+    }
+
+    BackHandler(enabled = overlay != Overlay.None || tab != Destination.Home) {
+        when {
+            overlay != Overlay.None -> overlay = Overlay.None
+            else -> tab = Destination.Home
+        }
+    }
+
+    Shell(
+        ambience = Ambience(
+            temperatureC = state.ambientTemperature,
+            occupied = state.home.people.any { it.present },
+            // `bright` is 0-100 from the ESP32 light sensor; a dark room dims the gradient.
+            dim = state.home.roomBright?.let { (1f - (it / 100f)).coerceIn(0f, 1f) } ?: 0f,
+        ),
+        topBar = {
+            HomeOsTopBar(
+                alias = state.alias,
+                linked = state.linked,
+                onSwitchPerson = { overlay = Overlay.People },
+                onOpenDev = { overlay = Overlay.Dev },
+            )
+        },
+        bottomBar = {
+            if (overlay == Overlay.None) {
+                HomeOsBottomNav(current = tab, onSelect = { tab = it })
+            }
+        },
+        overlay = {
+            HomeOsSheet(
+                visible = overlay == Overlay.Why,
+                onDismiss = { overlay = Overlay.None },
+                title = "Why",
+            ) {
+                WhyContent(
+                    explanation = why,
+                    evidence = whyEvidence,
+                    loading = whyLoading,
+                    error = whyError,
+                )
+            }
+
+            HomeOsSheet(
+                visible = overlay == Overlay.People,
+                onDismiss = { overlay = Overlay.None },
+                title = "Who's holding the phone?",
+            ) {
+                PeoplePicker(
+                    state = state,
+                    onPick = { alias ->
+                        repository.switchPerson(alias)
+                        overlay = Overlay.None
+                    },
+                )
+            }
+
+            if (overlay == Overlay.Dev) {
+                DevScreen(
+                    state = state,
+                    serverUrl = serverUrl(),
+                    healthConnectAvailable = healthConnectAvailable,
+                    lastSync = syncSummary,
+                    busy = syncing,
+                    onSetServer = { repository.setServer(it) },
+                    onSwitchPerson = { repository.switchPerson(it) },
+                    onSyncNow = {
+                        syncing = true
+                        scope.launch {
+                            syncSummary = onSync(2L)
+                            syncing = false
+                        }
+                    },
+                    onBackfill = {
+                        syncing = true
+                        scope.launch {
+                            syncSummary = onSync(120L)
+                            syncing = false
+                        }
+                    },
+                    onRequestPermissions = onRequestHealthPermissions,
+                    onClose = { overlay = Overlay.None },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        },
+    ) { padding ->
+        AnimatedContent(
+            targetState = tab,
+            transitionSpec = { fadeIn(animationSpec = androidx.compose.animation.core.tween(180)) togetherWith fadeOut(animationSpec = androidx.compose.animation.core.tween(120)) },
+            label = "tab",
+        ) { current ->
+            when (current) {
+                Destination.Home -> HomeScreen(
+                    state = state,
+                    lastSleep = lastSleep,
+                    contentPadding = padding,
+                    onWhy = openWhy,
+                    onOpenMemory = { tab = Destination.Memory },
+                    onAnswerPrompt = { answer -> scope.launch { repository.answerPrompt(answer) } },
+                )
+
+                Destination.CheckIn -> CheckInScreen(
+                    state = state,
+                    contentPadding = padding,
+                    onChip = { chip -> scope.launch { repository.sendChip(chip) } },
+                )
+
+                Destination.Ask -> AskScreen(
+                    turns = turns,
+                    pending = asking,
+                    contentPadding = padding,
+                    onAsk = { text ->
+                        turns.add(Turn(mine = true, text = text))
+                        asking = true
+                        scope.launch {
+                            repository.ask(text)
+                                .onSuccess { reply ->
+                                    turns.add(Turn(mine = false, text = reply.reply, tools = reply.tools))
+                                }
+                                .onFailure { error ->
+                                    turns.add(
+                                        Turn(
+                                            mine = false,
+                                            text = "Couldn't reach HomeOS: ${error.message}",
+                                            failed = true,
+                                        ),
+                                    )
+                                }
+                            asking = false
+                        }
+                    },
+                )
+
+                Destination.Memory -> MemoryScreen(
+                    alias = state.alias,
+                    data = memory,
+                    contentPadding = padding,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The person switcher.
+ *
+ * This is one phone a household shares, so identity is a product affordance rather than a settings
+ * field. A dataset person is listed but marked, because they can be inspected and never acted as in
+ * the room.
+ */
+@Composable
+private fun PeoplePicker(
+    state: AppState,
+    onPick: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = HomeOs.colors
+    val type = HomeOs.type
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(HomeOsDims.gutter)) {
+        state.home.people.forEach { person ->
+            val isMe = person.alias == state.alias
+            PaperBlock(
+                plate = if (isMe) Plate.Body else Plate.None,
+                onClick = { onPick(person.alias) },
+                padding = PaddingValues(horizontal = 14.dp, vertical = 14.dp),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    PersonBadge(alias = person.alias, dim = person.isDataset)
+                    Column(Modifier.weight(1f)) {
+                        Text(person.alias, style = type.blockTitle, color = colors.ink)
+                        Text(
+                            when {
+                                person.isDataset -> "public dataset · ${person.dataset}"
+                                person.present -> "in the bedroom"
+                                else -> "not home"
+                            },
+                            style = type.caption,
+                            color = colors.inkMuted,
+                        )
+                    }
+                    if (isMe) {
+                        Icon(
+                            com.homeos.bridge.ui.icons.HomeOsIcons.checkCircle,
+                            contentDescription = "current",
+                            tint = colors.tealInk,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.size(4.dp))
+        Text(
+            "Your body data, conditions and reasons are only ever read from the graph of whoever is " +
+                "selected here. Nobody else's agent can read them.",
+            style = type.caption,
+            color = colors.onShellMuted,
+        )
     }
 }
