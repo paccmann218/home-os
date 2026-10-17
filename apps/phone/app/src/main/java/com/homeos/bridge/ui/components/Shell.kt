@@ -196,7 +196,12 @@ private fun Modifier.ambient(ambience: Ambience): Modifier = composed {
 
 object ShellDims {
     val topBar: Dp = 60.dp
-    val bottomNav: Dp = 68.dp
+
+    /** The floating dock's own height. */
+    val dock: Dp = 62.dp
+
+    /** How far the dock floats above the system inset, and how far content clears it. */
+    val dockGap: Dp = 12.dp
 }
 
 /**
@@ -231,7 +236,9 @@ fun Shell(
             content(
                 PaddingValues(
                     top = statusBars.calculateTopPadding() + ShellDims.topBar,
-                    bottom = navBars.calculateBottomPadding() + ShellDims.bottomNav,
+                    // Clear the dock plus the gap it floats on, twice: once below it and once
+                    // above, so the last block never sits tight against the glass.
+                    bottom = navBars.calculateBottomPadding() + ShellDims.dock + ShellDims.dockGap * 2,
                 ),
             )
         }

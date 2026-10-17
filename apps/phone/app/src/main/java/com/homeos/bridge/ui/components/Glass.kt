@@ -33,15 +33,31 @@ import dev.chrisbanes.haze.hazeEffect
  * Border width stays 1dp at every level and only the alpha rises, following Windows 11, which holds
  * stroke-width 1 across all seven of its elevation levels.
  */
-enum class GlassLevel(val blur: Dp, val surfaceAlpha: Float, val borderAlpha: Float) {
+enum class GlassLevel(
+    val blur: Dp,
+    val surfaceAlpha: Float,
+    val borderAlpha: Float,
+    /**
+     * Whether this surface keeps a solid 2dp outline instead of the soft gradient rim.
+     *
+     * This is the one technique that makes glass and neobrutalism read as one design rather than
+     * two: a glass panel that keeps the hard, high-contrast border still belongs to the same family
+     * as the bordered paper blocks underneath it. Soft rims are right for chrome that should
+     * disappear; hard borders are right for anything that interrupts you.
+     */
+    val hardBorder: Boolean,
+) {
     /** A chip or a small control. */
-    Control(blur = 10.dp, surfaceAlpha = 0.78f, borderAlpha = 0.06f),
+    Control(blur = 10.dp, surfaceAlpha = 0.78f, borderAlpha = 0.06f, hardBorder = false),
 
-    /** Top bar and bottom nav. */
-    Chrome(blur = 24.dp, surfaceAlpha = 0.72f, borderAlpha = 0.08f),
+    /** Top bar: should recede. */
+    Chrome(blur = 24.dp, surfaceAlpha = 0.72f, borderAlpha = 0.08f, hardBorder = false),
 
-    /** Bottom sheet and dialog. */
-    Sheet(blur = 32.dp, surfaceAlpha = 0.86f, borderAlpha = 0.12f),
+    /** The floating bottom dock: an object, so it gets an object's outline. */
+    Dock(blur = 24.dp, surfaceAlpha = 0.80f, borderAlpha = 0.14f, hardBorder = true),
+
+    /** Bottom sheet and dialog: interrupts, so it gets a hard outline. */
+    Sheet(blur = 32.dp, surfaceAlpha = 0.86f, borderAlpha = 0.16f, hardBorder = true),
 }
 
 /**
@@ -64,13 +80,23 @@ fun GlassSurface(
     val hazeState = LocalHazeState.current
     val glassOn = HomeOs.glass && hazeState != null
 
-    // A 1dp rim, bright at the top-left and falling to transparent, is what actually reads as a
-    // curved glass edge. A uniform outline just reads as a flat border.
-    val rim = Brush.linearGradient(
-        0.0f to colors.onShell.copy(alpha = level.borderAlpha * 2.2f),
-        0.45f to colors.onShell.copy(alpha = level.borderAlpha),
-        1.0f to Color.Transparent,
-    )
+    // Soft rim: 1dp, bright at the top-left and falling to transparent, which is what actually
+    // reads as a curved glass edge. Hard border: a solid 2dp outline that matches the paper blocks,
+    // still with a brighter top-left so the surface keeps its sense of thickness.
+    val rim = if (level.hardBorder) {
+        Brush.linearGradient(
+            0.0f to colors.onShell.copy(alpha = 0.92f),
+            0.5f to colors.onShell.copy(alpha = 0.70f),
+            1.0f to colors.onShell.copy(alpha = 0.52f),
+        )
+    } else {
+        Brush.linearGradient(
+            0.0f to colors.onShell.copy(alpha = level.borderAlpha * 2.2f),
+            0.45f to colors.onShell.copy(alpha = level.borderAlpha),
+            1.0f to Color.Transparent,
+        )
+    }
+    val borderWidth = if (level.hardBorder) HomeOsDims.border else HomeOsDims.glassBorder
 
     val surface = if (glassOn) {
         Modifier.hazeEffect(
@@ -93,7 +119,7 @@ fun GlassSurface(
         modifier
             .clip(shape)
             .then(surface)
-            .border(HomeOsDims.glassBorder, rim, shape),
+            .border(borderWidth, rim, shape),
         content = content,
     )
 }

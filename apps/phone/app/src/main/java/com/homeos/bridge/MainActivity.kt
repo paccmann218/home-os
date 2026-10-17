@@ -41,10 +41,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.homeos.bridge.data.AppState
 import com.homeos.bridge.data.Decision
+import com.homeos.bridge.data.Device
 import com.homeos.bridge.data.DeviceEvent
 import com.homeos.bridge.data.Episode
 import com.homeos.bridge.data.EvidenceRow
 import com.homeos.bridge.data.Explanation
+import com.homeos.bridge.data.GraphData
 import com.homeos.bridge.data.HomeOsRepository
 import com.homeos.bridge.theme.HomeOs
 import com.homeos.bridge.theme.HomeOsDims
@@ -54,12 +56,14 @@ import com.homeos.bridge.ui.ask.AskScreen
 import com.homeos.bridge.ui.ask.Turn
 import com.homeos.bridge.ui.checkin.CheckInScreen
 import com.homeos.bridge.ui.components.Ambience
+import com.homeos.bridge.ui.components.ApplianceCatalogue
 import com.homeos.bridge.ui.components.Destination
-import com.homeos.bridge.ui.components.HomeOsBottomNav
+import com.homeos.bridge.ui.components.DeviceDetail
+import com.homeos.bridge.ui.components.HomeOsDock
 import com.homeos.bridge.ui.components.HomeOsSheet
 import com.homeos.bridge.ui.components.HomeOsTopBar
 import com.homeos.bridge.ui.components.PaperBlock
-import com.homeos.bridge.ui.components.PersonBadge
+import com.homeos.bridge.ui.components.PersonAvatar
 import com.homeos.bridge.ui.components.Shell
 import com.homeos.bridge.ui.dev.DevScreen
 import com.homeos.bridge.ui.home.HomeScreen
@@ -178,7 +182,7 @@ class MainActivity : ComponentActivity() {
 }
 
 /** Which overlay, if any, is on top of the tabs. */
-private enum class Overlay { None, Dev, People, Why }
+private enum class Overlay { None, Dev, People, Why, Device, AddAppliance }
 
 @Composable
 private fun BridgeApp(
@@ -203,6 +207,8 @@ private fun BridgeApp(
 
     var memory by remember { mutableStateOf(MemoryData()) }
     var lastSleep by remember { mutableStateOf<Episode?>(null) }
+    var graphOf by remember { mutableStateOf("") }
+    var openDevice by remember { mutableStateOf<Device?>(null) }
 
     var why by remember { mutableStateOf<Explanation?>(null) }
     var whyEvidence by remember { mutableStateOf<List<EvidenceRow>>(emptyList()) }
@@ -234,7 +240,20 @@ private fun BridgeApp(
             changes = repository.beliefDiff().getOrDefault(emptyList()),
             stats = repository.stats().getOrDefault(emptyList()),
             loading = false,
+            graph = memory.graph,
+            graphOf = memory.graphOf,
+            graphLoading = memory.graphLoading,
         )
+        if (graphOf.isEmpty()) graphOf = state.alias
+    }
+
+    // The graph is loaded and laid out separately from the rest of Memory: it is the slowest thing
+    // on the screen and should not hold up the text around it.
+    LaunchedEffect(graphOf) {
+        if (graphOf.isEmpty()) return@LaunchedEffect
+        memory = memory.copy(graphLoading = true, graphOf = graphOf)
+        val loaded = repository.graph(graphOf).getOrDefault(GraphData.Empty)
+        memory = memory.copy(graph = loaded, graphOf = graphOf, graphLoading = false)
     }
 
     val openWhy: (Decision) -> Unit = { decision ->
@@ -277,7 +296,7 @@ private fun BridgeApp(
         },
         bottomBar = {
             if (overlay == Overlay.None) {
-                HomeOsBottomNav(current = tab, onSelect = { tab = it })
+                HomeOsDock(current = tab, onSelect = { tab = it })
             }
         },
         overlay = {
@@ -303,9 +322,35 @@ private fun BridgeApp(
                     state = state,
                     onPick = { alias ->
                         repository.switchPerson(alias)
+                        graphOf = alias
                         overlay = Overlay.None
                     },
                 )
+            }
+
+            HomeOsSheet(
+                visible = overlay == Overlay.Device,
+                onDismiss = { overlay = Overlay.None },
+                title = openDevice?.name ?: "Appliance",
+            ) {
+                openDevice?.let { device ->
+                    DeviceDetail(
+                        device = device,
+                        decision = state.latestDecision,
+                        onWhy = { decision ->
+                            overlay = Overlay.None
+                            openWhy(decision)
+                        },
+                    )
+                }
+            }
+
+            HomeOsSheet(
+                visible = overlay == Overlay.AddAppliance,
+                onDismiss = { overlay = Overlay.None },
+                title = "Add appliance",
+            ) {
+                ApplianceCatalogue(connected = state.home.devices)
             }
 
             if (overlay == Overlay.Dev) {
@@ -350,6 +395,11 @@ private fun BridgeApp(
                     contentPadding = padding,
                     onWhy = openWhy,
                     onOpenMemory = { tab = Destination.Memory },
+                    onOpenDevice = { device ->
+                        openDevice = device
+                        overlay = Overlay.Device
+                    },
+                    onAddAppliance = { overlay = Overlay.AddAppliance },
                     onAnswerPrompt = { answer -> scope.launch { repository.answerPrompt(answer) } },
                 )
 
@@ -389,6 +439,7 @@ private fun BridgeApp(
                     alias = state.alias,
                     data = memory,
                     contentPadding = padding,
+                    onSelectGraph = { which -> graphOf = which },
                 )
             }
         }
@@ -411,6 +462,19 @@ private fun PeoplePicker(
     val colors = HomeOs.colors
     val type = HomeOs.type
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(HomeOsDims.gutter)) {
+        if (state.home.people.isEmpty()) {
+            // The household list comes from the server, so with no connection there is genuinely
+            // nobody to offer. Saying so beats an empty sheet with a caption under it.
+            PaperBlock(plate = Plate.Failure) {
+                Text("Can't list the household", style = type.blockTitle, color = colors.ink)
+                Text(
+                    "The home is unreachable, so the people it knows about can't be loaded. " +
+                        "You are still acting as ${state.alias.ifEmpty { "nobody" }}.",
+                    style = type.caption,
+                    color = colors.inkMuted,
+                )
+            }
+        }
         state.home.people.forEach { person ->
             val isMe = person.alias == state.alias
             PaperBlock(
@@ -422,7 +486,12 @@ private fun PeoplePicker(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    PersonBadge(alias = person.alias, dim = person.isDataset)
+                    PersonAvatar(
+                        alias = person.alias,
+                        size = 44.dp,
+                        present = if (person.isDataset) null else person.present,
+                        dim = person.isDataset,
+                    )
                     Column(Modifier.weight(1f)) {
                         Text(person.alias, style = type.blockTitle, color = colors.ink)
                         Text(

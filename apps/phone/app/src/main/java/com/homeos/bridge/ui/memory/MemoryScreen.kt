@@ -1,32 +1,47 @@
 package com.homeos.bridge.ui.memory
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.homeos.bridge.data.BeliefChange
 import com.homeos.bridge.data.Driver
 import com.homeos.bridge.data.Episode
 import com.homeos.bridge.data.EvidenceRow
+import com.homeos.bridge.data.GraphData
 import com.homeos.bridge.data.GraphStat
 import com.homeos.bridge.data.Playbook
 import com.homeos.bridge.theme.HomeOs
 import com.homeos.bridge.theme.HomeOsDims
+import com.homeos.bridge.theme.HomeOsShapes
 import com.homeos.bridge.theme.Plate
 import com.homeos.bridge.ui.components.EvidenceBars
+import com.homeos.bridge.ui.components.GRAPH_FAMILIES
+import com.homeos.bridge.ui.components.GraphView
 import com.homeos.bridge.ui.components.PaperBlock
 import com.homeos.bridge.ui.components.SectionHeader
 import com.homeos.bridge.ui.components.StatusDot
@@ -46,6 +61,11 @@ data class MemoryData(
     val changes: List<BeliefChange> = emptyList(),
     val stats: List<GraphStat> = emptyList(),
     val loading: Boolean = true,
+    /** The subgraph currently drawn. */
+    val graph: GraphData = GraphData.Empty,
+    /** Which graph that is: a person's alias, or "home". */
+    val graphOf: String = "",
+    val graphLoading: Boolean = false,
 )
 
 private val DAY_FORMAT = DateTimeFormatter.ofPattern("d MMM, HH:mm")
@@ -62,6 +82,7 @@ fun MemoryScreen(
     alias: String,
     data: MemoryData,
     contentPadding: PaddingValues,
+    onSelectGraph: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = HomeOs.colors
@@ -73,15 +94,24 @@ fun MemoryScreen(
             start = HomeOsDims.screenMargin,
             end = HomeOsDims.screenMargin,
             top = contentPadding.calculateTopPadding() + 12.dp,
-            bottom = contentPadding.calculateBottomPadding() + 24.dp,
+            bottom = contentPadding.calculateBottomPadding(),
         ),
         verticalArrangement = Arrangement.spacedBy(HomeOsDims.gutter),
     ) {
         item(key = "header") {
-            SectionHeader(
-                title = "Memory",
-                trailing = "body:$alias",
+            SectionHeader(title = "Memory", trailing = "body:$alias")
+        }
+
+        item(key = "graph") {
+            GraphPanel(
+                alias = alias,
+                data = data,
+                onSelectGraph = onSelectGraph,
             )
+        }
+
+        item(key = "isolation") {
+            IsolationPanel(alias = alias, stats = data.stats)
         }
 
         if (data.drivers.isNotEmpty()) {
@@ -120,7 +150,13 @@ fun MemoryScreen(
         item(key = "timeline-header") {
             Spacer(Modifier.height(4.dp))
             Text(
-                "TIMELINE · ${data.episodes.size} EPISODE${if (data.episodes.size == 1) "" else "S"}",
+                // No count while loading: claiming "0 EPISODES" over a "reading the graph" block
+                // is the screen contradicting itself.
+                if (data.loading) {
+                    "TIMELINE"
+                } else {
+                    "TIMELINE · ${data.episodes.size} EPISODE${if (data.episodes.size == 1) "" else "S"}"
+                },
                 style = type.micro,
                 color = colors.onShellMuted,
             )
@@ -199,6 +235,218 @@ fun MemoryScreen(
                 }
             }
         }
+    }
+}
+
+/**
+ * The graph itself, turning.
+ *
+ * It sits in a bordered dark viewport rather than on paper, and that is a deliberate exception to
+ * the layering rule: a glowing depth-sorted graph needs a dark field to read at all, and this is a
+ * window onto the memory rather than a surface carrying numbers. It keeps the 2dp border so it
+ * still belongs to the same family as the blocks above and below it.
+ */
+@Composable
+private fun GraphPanel(
+    alias: String,
+    data: MemoryData,
+    onSelectGraph: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = HomeOs.colors
+    val type = HomeOs.type
+    val showingHome = data.graphOf == "home"
+
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Two graphs, one switch. Putting them side by side is the clearest statement the product
+        // can make: your body graph and the shared home graph are different objects.
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(HomeOsShapes.pill)
+                .background(colors.onShell.copy(alpha = 0.07f))
+                .border(1.dp, colors.onShellMuted.copy(alpha = 0.30f), HomeOsShapes.pill)
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            GraphTab("body:$alias", "private", !showingHome, Modifier.weight(1f)) { onSelectGraph(alias) }
+            GraphTab("home:flat1", "shared", showingHome, Modifier.weight(1f)) { onSelectGraph("home") }
+        }
+
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(360.dp)
+                .clip(HomeOsShapes.block)
+                .background(colors.shellSunk)
+                .border(HomeOsDims.border, colors.onShell.copy(alpha = 0.55f), HomeOsShapes.block),
+            contentAlignment = Alignment.Center,
+        ) {
+            when {
+                data.graphLoading -> Text("Reading the graph…", style = type.caption, color = colors.onShellMuted)
+                data.graph.isEmpty -> Text(
+                    "This graph is empty.",
+                    style = type.caption,
+                    color = colors.onShellMuted,
+                )
+                else -> GraphView(data = data.graph, modifier = Modifier.fillMaxSize())
+            }
+            if (!data.graph.isEmpty && !data.graphLoading) {
+                Text(
+                    "drag to turn · tap a node",
+                    style = type.micro,
+                    color = colors.onShellMuted,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(12.dp),
+                )
+                // `/api/graph` returns a bounded page while `/api/stats` counts the whole graph, so
+                // say which is which rather than printing two different totals on one screen.
+                val whole = data.stats.firstOrNull {
+                    it.graph == if (showingHome) "home:flat1" else "body:$alias"
+                }
+                Text(
+                    if (whole != null && whole.nodes > data.graph.nodes.size) {
+                        "${data.graph.nodes.size} of ${whole.nodes} nodes"
+                    } else {
+                        "${data.graph.nodes.size} nodes · ${data.graph.edges.size} edges"
+                    },
+                    style = type.monoMicro,
+                    color = colors.onShellMuted,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(12.dp),
+                )
+            }
+        }
+
+        GraphLegend()
+    }
+}
+
+@Composable
+private fun GraphTab(
+    label: String,
+    sub: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val colors = HomeOs.colors
+    Column(
+        modifier
+            .clip(HomeOsShapes.pill)
+            .background(if (selected) colors.teal.copy(alpha = 0.18f) else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            label,
+            style = HomeOs.type.monoMicro,
+            color = if (selected) colors.teal else colors.onShellMuted,
+        )
+        Text(
+            sub,
+            style = HomeOs.type.micro,
+            color = if (selected) colors.onShell else colors.onShellMuted,
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun GraphLegend(modifier: Modifier = Modifier) {
+    val colors = HomeOs.colors
+    FlowRow(
+        modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        // Driven by the same list the renderer colours from, so the key can never describe a
+        // palette the picture is not using.
+        GRAPH_FAMILIES.forEach { (caption, pick) ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                Box(Modifier.size(8.dp).clip(CircleShape).background(pick(colors)))
+                Text(caption, style = HomeOs.type.micro, color = colors.onShellMuted)
+            }
+        }
+    }
+}
+
+/**
+ * The isolation statement, with the numbers behind it.
+ *
+ * This is the project's Track 2 claim made checkable rather than asserted: one private graph per
+ * person, a separate shared graph for the home, and a per-person FalkorDB ACL user that cannot read
+ * anyone else's. The node and edge counts come from `/api/stats`, so the sizes on screen are the
+ * real graphs.
+ */
+@Composable
+private fun IsolationPanel(
+    alias: String,
+    stats: List<GraphStat>,
+    modifier: Modifier = Modifier,
+) {
+    val colors = HomeOs.colors
+    val type = HomeOs.type
+    val mine = stats.firstOrNull { it.graph == "body:$alias" }
+    val home = stats.firstOrNull { it.graph.startsWith("home:") }
+    val others = stats.filter { it.graph.startsWith("body:") && it.graph != "body:$alias" }
+
+    PaperBlock(modifier = modifier, plate = Plate.Body) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(
+                HomeOsIcons.shieldLock,
+                contentDescription = null,
+                tint = colors.tealInk,
+                modifier = Modifier.size(18.dp),
+            )
+            Text("ONE GRAPH PER PERSON", style = type.micro, color = colors.inkMuted)
+        }
+        Text(
+            "Your memory is its own graph, and the agent that reads it logs in as you. " +
+                "The home has a separate graph that only ever holds ranges, never reasons.",
+            style = type.body,
+            color = colors.ink,
+        )
+        Spacer(Modifier.height(2.dp))
+        GraphRow("body:$alias", mine, "yours · private", colors.tealInk)
+        home?.let { GraphRow(it.graph, it, "shared · ranges only", colors.violetInk) }
+        others.forEach { other ->
+            GraphRow(other.graph, other, "not readable by you", colors.inkMuted)
+        }
+    }
+}
+
+@Composable
+private fun GraphRow(
+    name: String,
+    stat: GraphStat?,
+    note: String,
+    accent: Color,
+    modifier: Modifier = Modifier,
+) {
+    val colors = HomeOs.colors
+    val type = HomeOs.type
+    Row(
+        modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(Modifier.size(6.dp).clip(CircleShape).background(accent))
+        Column(Modifier.weight(1f)) {
+            Text(name, style = type.mono, color = colors.ink)
+            Text(note, style = type.micro, color = colors.inkMuted)
+        }
+        Text(
+            if (stat != null) "${stat.nodes} / ${stat.edges}" else "–",
+            style = type.mono,
+            color = colors.inkMuted,
+        )
     }
 }
 

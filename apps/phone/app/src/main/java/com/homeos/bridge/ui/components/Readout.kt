@@ -141,13 +141,16 @@ fun StatReadout(
         Text(label.uppercase(), style = type.micro, color = colors.inkMuted)
     }
 
+    // A missing value is set in the muted tone, and drops its unit. At 40sp SemiBold a dark dash
+    // reads as a redaction bar rather than as an absence, which is the opposite of the intent.
+    val missing = value == NO_VALUE
     Row(verticalAlignment = Alignment.Bottom, modifier = modifier) {
         Text(
             text = value,
             style = if (hero) type.hero else type.readout,
-            color = colors.ink,
+            color = if (missing) colors.inkMuted.copy(alpha = 0.45f) else colors.ink,
         )
-        if (unit != null) {
+        if (unit != null && !missing) {
             Spacer(Modifier.width(4.dp))
             Text(
                 text = unit,
@@ -195,18 +198,26 @@ fun SectionHeader(
     }
 }
 
-/** Formats a value for a readout: one decimal under 10, whole numbers above, em dash when absent. */
+/** What a readout shows when there is nothing to show. An en dash, not an em dash. */
+const val NO_VALUE = "–"
+
+/** Formats a value for a readout: one decimal under 10, whole numbers above, [NO_VALUE] when absent. */
 fun readoutValue(v: Float?): String = when {
-    v == null -> "—"
+    v == null -> NO_VALUE
     abs(v) < 10f -> "%.1f".format(v)
     else -> v.roundToInt().toString()
 }
 
-/** A presence dot. Colour is never the only channel — it always sits beside a label. */
+/**
+ * A status dot. Colour is never the only channel here — it always sits beside a label.
+ *
+ * [onColor] wins when given, for both states, so a caller can say "off means red" rather than
+ * being forced into the muted default.
+ */
 @Composable
 fun StatusDot(on: Boolean, modifier: Modifier = Modifier, onColor: Color? = null) {
     val colors = HomeOs.colors
-    val fill = if (on) (onColor ?: colors.green) else colors.onShellMuted
+    val fill = onColor ?: if (on) colors.green else colors.onShellMuted
     Canvas(modifier.size(8.dp)) {
         drawCircle(fill)
     }

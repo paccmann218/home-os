@@ -83,18 +83,10 @@ fun Sparkline(
 ) {
     val colors = HomeOs.colors
     val line = plate.ink(colors)
-    if (values.size < 2) {
-        Canvas(modifier.fillMaxWidth().height(36.dp)) {
-            // A flat rule, so an empty sparkline reads as "no data yet" and not as a flat line.
-            drawLine(
-                color = colors.ink.copy(alpha = 0.12f),
-                start = Offset(0f, size.height / 2),
-                end = Offset(size.width, size.height / 2),
-                strokeWidth = 1.dp.toPx(),
-            )
-        }
-        return
-    }
+    // Draw nothing at all rather than a faint rule. A near-invisible line in reserved space reads
+    // as a block that failed to finish loading; the readout's own note already says there is no
+    // data, so the honest thing is to take the space back.
+    if (values.size < 2) return
 
     Canvas(modifier.fillMaxWidth().height(36.dp)) {
         val min = values.min()

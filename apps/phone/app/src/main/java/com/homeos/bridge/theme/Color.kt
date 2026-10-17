@@ -85,6 +85,30 @@ val HomeOsPalette = HomeOsColors(
 )
 
 /**
+ * Avatar gradients, one per person, picked by a hash of the alias so the same person keeps the same
+ * identity everywhere without the backend having to store one.
+ *
+ * Deep-to-mid pairs at a constant lightness step across six hues. The monogram is set in [paper],
+ * which measures 7.2-8.1:1 on the deep stop and 3.6-4.1:1 on the mid stop, so a monogram placed
+ * over the darker half of the gradient always clears AA.
+ */
+val AvatarGradients: List<Pair<Color, Color>> = listOf(
+    Color(0xFF095955) to Color(0xFF158C87), // teal
+    Color(0xFF543A8B) to Color(0xFF8264C8), // violet
+    Color(0xFF684507) to Color(0xFFA26F11), // amber
+    Color(0xFF852535) to Color(0xFFC24D5D), // rose
+    Color(0xFF095C3B) to Color(0xFF159060), // green
+    Color(0xFF294793) to Color(0xFF4E75D2), // indigo
+)
+
+/** Stable per-alias colour pair. */
+fun avatarGradient(alias: String): Pair<Color, Color> {
+    if (alias.isEmpty()) return AvatarGradients[0]
+    val hash = alias.fold(7) { acc, c -> acc * 31 + c.code }
+    return AvatarGradients[((hash % AvatarGradients.size) + AvatarGradients.size) % AvatarGradients.size]
+}
+
+/**
  * What a block's plate says.
  *
  * Canonical neobrutalism puts a black hard shadow under every block. On a dark shell that measures
