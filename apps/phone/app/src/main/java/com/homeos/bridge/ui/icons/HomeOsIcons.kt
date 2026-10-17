@@ -3,6 +3,7 @@ package com.homeos.bridge.ui.icons
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import java.util.concurrent.ConcurrentHashMap
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.unit.dp
 
@@ -15,7 +16,7 @@ import androidx.compose.ui.unit.dp
  * bottom-left (viewBox "0 -960 960 960"), so every path is drawn inside a group translated down by
  * 960 to put it back in Compose's top-left space.
  */
-private val cache = HashMap<String, ImageVector>()
+private val cache = ConcurrentHashMap<String, ImageVector>()
 
 private fun icon(name: String, pathData: String): ImageVector = cache.getOrPut(name) {
     ImageVector.Builder(
