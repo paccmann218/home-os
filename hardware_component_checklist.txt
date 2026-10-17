@@ -1,0 +1,21 @@
+MUST-BUY ITEMS (CORE DEMO)
+- Smart bulbs with local control (2x Philips WiZ or TP-Link Tapo L530E)
+- IR blaster (Broadlink RM4 Mini or ESP32 with IR LED transmitter)
+- Smart plug with power monitoring (TP-Link Tapo P110)
+- ESP32 Development Board (ESP32 DevKit V1 / NodeMCU, 30-pin)
+- Sensirion SCD41 CO2, temperature, and humidity sensor module
+- Hi-Link HLK-LD2410C mmWave presence radar sensor module
+- BH1750 ambient light sensor module
+- Breadboard (400 tie-points)
+- Dupont jumper wires (Male-to-Male and Male-to-Female)
+
+EXTRA / OPTIONAL ITEMS
+- Dedicated Wi-Fi router (or portable travel router)
+- Raspberry Pi 5 (8 GB RAM model)
+- Table fan or small desk exhaust fan
+- Addressable LED strip (WS2812B 5V)
+- Extra ESP32 development board (for WLED or dedicated IR transmitter)
+- 5V power supply (for LED strip)
+- Phone tripod / mount
+- USB Bluetooth (BLE) adapter
+- Spare USB cables and power banks
