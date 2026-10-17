@@ -15,6 +15,11 @@ const groupOf = (label: string) => GROUPS.find((g) => g.labels.includes(label)) 
 
 function caption(n: GNode): string {
   const p = n.props;
+  if (n.label === "Episode") {
+    const d = p.start ? new Date(p.start).toISOString().slice(5, 10) : "";
+    return `${p.kind ?? "episode"} ${d}`.trim();
+  }
+  if (n.label === "Insight") return `insight · ${p.algo ?? ""}`;
   return String(p.alias ?? p.key ?? p.kind ?? p.name ?? p.label ?? p.id ?? n.label).slice(0, 26);
 }
 
@@ -79,7 +84,9 @@ export function GraphView({ graph, highlight }: { graph: Graph | null; highlight
           ctx.fillStyle = g.color;
           ctx.fill();
           ctx.lineWidth = 2 / scale;
-          ctx.strokeStyle = hiNodes.has(n.id) ? "#4fd1c5" : "#0b1322";
+          // Bad episodes (rated or measured) get a red ring.
+          ctx.strokeStyle = hiNodes.has(n.id) ? "#4fd1c5" : n.props?.quality === "bad" ? "#e66767" : "#0b1322";
+          if (n.props?.quality === "bad") ctx.lineWidth = 3 / scale;
           ctx.stroke();
           if (scale > 1.4 || hiNodes.has(n.id) || n.label === "Person") {
             ctx.font = `${10 / scale + 1}px Inter`;
@@ -96,6 +103,10 @@ export function GraphView({ graph, highlight }: { graph: Graph | null; highlight
             {g.name}
           </span>
         ))}
+        <span>
+          <span className="dot" style={{ border: "2px solid #e66767", marginRight: 4 }} />
+          bad night / episode
+        </span>
       </div>
     </div>
   );

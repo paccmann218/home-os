@@ -8,6 +8,11 @@ HomeOS links a **Galaxy Watch**, a **Gabit smart ring** and **room sensors** to 
 
 > Demo video: _link added on submission_ · Dashboard: `http://localhost:3001` · FalkorDB Browser: `http://localhost:3000`
 
+<p align="center">
+  <img src="docs/img/dashboard-scientist.png" alt="HomeOS dashboard: p01's private graph and the Scientist's PageRank, betweenness, label-propagation and SPpaths findings" width="78%" />
+  <img src="docs/img/watch.png" alt="HomeOS on a Galaxy Watch4 answering 'What helps me when I'm sick?' with Sarvam voice" width="20%" />
+</p>
+
 ```
 "I'm feeling sick" (watch)  ─▶  private Condition{sick} in body:shashwath
                               ─▶ fever ⇒ sick ⇒ SHIFTS room_temp ≥ 26 °C, airflow ≤ 1   (multi-hop, graph data)
