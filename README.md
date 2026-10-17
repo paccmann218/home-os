@@ -80,6 +80,23 @@ The Scientist works on *deviations from the person's own normal*: bands such as 
 
 Asked "What usually ruins my nights?", the Coach chose `drivers`, `keystone` and `what_works` through MCP and answered: *"Mostly short sleep windows, evening workouts, and elevated resting heart rate."*
 
+### Latency (graph work per decision)
+
+Each query ran 30 times through the agents' own client and ACL users, against FalkorDB in Docker on a laptop ([`scripts/bench.ts`](backend/scripts/bench.ts), [`docs/results/latency.json`](docs/results/latency.json)). The p01 graph has 254 nodes and 1326 edges.
+
+| Query | p50 | p95 |
+|---|---|---|
+| `effective_comfort (multi-hop, harsh)` | 6.2 ms | 13.8 ms |
+| `feasible_settings (multi-hop, home)` | 6.0 ms | 7.2 ms |
+| `impact (algo.bfs, home)` | 4.0 ms | 4.8 ms |
+| `choose_intervention (Thompson UDF, p01)` | 6.5 ms | 7.7 ms |
+| `why_bad_night (algo.SPpaths, p01)` | 4.1 ms | 5.9 ms |
+| `drivers (algo.pageRank, p01)` | 3.6 ms | 5.0 ms |
+| `keystone (algo.betweenness, p01)` | 5.6 ms | 24.2 ms |
+| `similar_episodes (vector + bands, p01)` | 6.8 ms | 8.3 ms |
+
+The graph is never the bottleneck. A full voice round trip (Sarvam STT → Coach choosing graph tools over MCP → Sarvam TTS on the watch) takes about 6–9 s, almost all of it LLM and speech.
+
 ---
 
 ## How it works
