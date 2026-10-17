@@ -1,4 +1,4 @@
-# Vagus: Project Context (Graph Hacks 2026)
+# HomeOS: Project Context (Graph Hacks 2026)
 
 > Working name. Last updated 2026-10-09.
 > This file is the single source of truth for the team and for any coding assistant working on the repo.
@@ -80,7 +80,7 @@
 - **Hardware demos need a replay or simulated stream.** Smart Home Orchestrator used one.
 
 ### Ideas we considered and parked
-ProbeGraph (circuit-board fault finding), HiveMind (shared robot memory), DoseGuard (pillbox), lockout/tagout planner, NetSentry (IoT network triage). We chose Vagus because it uses the hardware we already own.
+ProbeGraph (circuit-board fault finding), HiveMind (shared robot memory), DoseGuard (pillbox), lockout/tagout planner, NetSentry (IoT network triage). We chose HomeOS because it uses the hardware we already own.
 
 ---
 
@@ -380,7 +380,7 @@ FalkorDB concurrency (verified, [docs](https://docs.falkordb.com/design/concurre
 ```cypher
 MATCH (ep:Episode {id:$ep})-[:IN_STATE]->(b:Band)<-[:WHEN]-(e:Evidence {kind:ep.kind})-[:FOR]->(i:Intervention)
 WITH i, count(b) AS matched, sum(e.n) AS n, sum(e.n * e.mean) / sum(e.n) AS mean
-RETURN i.name AS intervention, matched, n, mean, Vagus.sample(n, mean) AS draw
+RETURN i.name AS intervention, matched, n, mean, HomeOS.sample(n, mean) AS draw
 ORDER BY matched DESC, draw DESC
 LIMIT 3
 ```
@@ -389,7 +389,7 @@ The Planner then removes any candidate that would push another present person ou
 **Learn** (Evaluator)
 ```cypher
 MATCH (e:Evidence {kind:$kind})-[:FOR]->(:Intervention {name:$i}), (e)-[:WHEN]->(:Band {key:$band})
-WITH e, Vagus.welford(e.n, e.mean, e.m2, $effect) AS s
+WITH e, HomeOS.welford(e.n, e.mean, e.m2, $effect) AS s
 SET e.n = s.n, e.mean = s.mean, e.m2 = s.m2
 ```
 Run this once per band the episode touched, or `UNWIND $bands`.
@@ -453,7 +453,7 @@ OPTIONAL MATCH (node)-[:ABOUT]->(x)
 RETURN s.started, node.role, node.text, labels(x), score
 ```
 
-### 8.9 UDF library `Vagus` (JavaScript, loaded with `GRAPH.UDF LOAD` or `db.udf_load` in falkordb-py)
+### 8.9 UDF library `HomeOS` (JavaScript, loaded with `GRAPH.UDF LOAD` or `db.udf_load` in falkordb-py)
 ```js
 function welford(n, mean, m2, x) {
   const n1 = n + 1;
@@ -520,7 +520,7 @@ Example numbers in a script must come from real recorded data, never invented.
 - **One command:** `docker compose up` starts FalkorDB, Home Assistant (or a stub in replay mode), the backend and the UI.
 
 ```
-vagus/
+homeos/
   CONTEXT.md                 # this file
   README.md                  # with the Tracks tables (§9) at the top
   docker-compose.yml
@@ -535,7 +535,7 @@ vagus/
     schema.cypher
     seed/priors.cypher       # literature priors with source_url
     queries/*.cypher         # decide, learn, explain, discover, lease, recall
-    udf/vagus.js
+    udf/homeos.js
   replay/
     data/*.jsonl
     player.py

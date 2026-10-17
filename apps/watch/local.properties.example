@@ -1,0 +1,4 @@
+# Copy to local.properties (gitignored) and set your laptop's LAN IP + who wears this watch.
+sdk.dir=C\:\Users\<you>\AppData\Local\Android\Sdk
+homeos.ws=ws://10.129.143.167:3001/ws/device
+homeos.alias=harsh
