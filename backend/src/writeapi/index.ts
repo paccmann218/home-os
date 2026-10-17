@@ -8,7 +8,7 @@ import { now } from "../graph/db.js";
 import { FOREVER } from "../graph/constants.js";
 import { bus, newId } from "../bus.js";
 import { embed } from "../llm/azure.js";
-import { HABIT_VARS, type BandSpec } from "../ingest/bands.js";
+import { HABIT_VARS, DEFAULT_LEVELS, type BandSpec } from "../ingest/bands.js";
 
 const HOUR = 3600_000;
 export const DEFAULT_ROOM = "bedroom";
@@ -117,6 +117,7 @@ export async function openEpisode(
     bands: e.bands,
   });
   await bodyWrite(alias, "link_bands", { habits: HABIT_VARS });
+  await bodyWrite(alias, "classify_bands", { defaults: DEFAULT_LEVELS });
   void embed(`${e.kind}: ${e.summary}. Context: ${e.bands.map((b) => b.key).join(", ")}`).then((vec) =>
     vec ? bodyWrite(alias, "set_episode_embedding", { id, vec }).catch(() => undefined) : undefined,
   );

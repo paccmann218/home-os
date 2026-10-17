@@ -14,7 +14,12 @@ import { pushHr } from "./buffer.js";
 
 export interface HealthBatch {
   source?: string;
-  sleep?: { start: number; end: number; stages?: { start: number; end: number; stage: string }[] }[];
+  /** Wall-clock offset of the person's data (minutes east of UTC); default IST. */
+  utc_offset_min?: number;
+  /** Human label for episode summaries, e.g. "PMData p01 (public dataset)". */
+  label?: string;
+  /** quality: the person's own rating of the night when available (e.g. PMData wellness 1-5). */
+  sleep?: { start: number; end: number; quality?: "good" | "bad"; stages?: { start: number; end: number; stage: string }[] }[];
   heart_rate?: { t: number; bpm: number }[];
   resting_hr?: { t: number; bpm: number }[];
   steps?: { start: number; end: number; count: number }[];
@@ -48,18 +53,25 @@ export async function ingestHealth(alias: string, b: HealthBatch) {
   // Recent heart-rate samples also feed the live buffer (ring HR when the watch is off).
   for (const s of (b.heart_rate ?? []).filter((x) => now() - x.t < 15 * 60_000)) pushHr(alias, { t: s.t, hr: s.bpm });
 
-  // Baselines (semantic memory, bi-temporal) from the last 30 days.
-  const recentRhr = (b.resting_hr ?? []).filter((x) => now() - x.t < 30 * DAY).map((x) => x.bpm);
+  // Baselines (semantic memory, bi-temporal) from the 30 days before the batch's newest record
+  // (= "now" for live syncs; the end of the recording for an imported history).
+  const times = [
+    ...(b.resting_hr ?? []).map((x) => x.t),
+    ...(b.heart_rate ?? []).map((x) => x.t),
+    ...(b.sleep ?? []).map((x) => x.end),
+  ];
+  const ref = times.length ? Math.max(...times) : now();
+  const recentRhr = (b.resting_hr ?? []).filter((x) => ref - x.t < 30 * DAY).map((x) => x.bpm);
   if (recentRhr.length >= 3) {
     await w.setBaseline(alias, "hr_rest", median(recentRhr), Math.max(sd(recentRhr), 1.5), recentRhr.length, "health_connect");
     out.baselines.push("hr_rest");
   }
-  const dayHr = (b.heart_rate ?? []).filter((x) => now() - x.t < 14 * DAY).map((x) => x.bpm);
+  const dayHr = (b.heart_rate ?? []).filter((x) => ref - x.t < 14 * DAY).map((x) => x.bpm);
   if (dayHr.length >= 50) {
     await w.setBaseline(alias, "hr", median(dayHr), Math.max(sd(dayHr), 4), dayHr.length, "health_connect");
     out.baselines.push("hr");
   }
-  const hrv = (b.hrv ?? []).filter((x) => now() - x.t < 30 * DAY).map((x) => x.rmssd);
+  const hrv = (b.hrv ?? []).filter((x) => ref - x.t < 30 * DAY).map((x) => x.rmssd);
   if (hrv.length >= 3) {
     await w.setBaseline(alias, "rmssd", median(hrv), Math.max(sd(hrv), 3), hrv.length, "health_connect");
     out.baselines.push("rmssd");
@@ -80,13 +92,15 @@ export async function ingestHealth(alias: string, b: HealthBatch) {
     const deepSd = sd(stats.filter((s) => s.hasStages).map((s) => s.deep)) || 10;
     const durMed = median(stats.map((s) => s.durationMin));
     const durSd = sd(stats.map((s) => s.durationMin)) || 30;
-    const usualBed = median(nights.map((n) => minutesAfterSixPm(n.start)));
+    const offsetMin = b.utc_offset_min ?? 330;
+    const usualBed = median(nights.map((n) => minutesAfterSixPm(n.start, offsetMin)));
     const rhrMed = median(recentRhr);
     const rhrSd = Math.max(sd(recentRhr), 1.5);
 
     for (const s of stats) {
       const id = `sleep-${alias}-${s.n.start}`;
-      if (have.has(id)) continue;
+      if (have.has(id)) continue; // already in memory, or a duplicate within this batch
+      have.add(id);
       const dayStart = s.n.start - 16 * 3600_000;
       const stepsBefore = (b.steps ?? []).filter((x) => x.start >= dayStart && x.end <= s.n.start).reduce((a, x) => a + x.count, 0);
       const workoutEvening = (b.exercise ?? [])
@@ -102,11 +116,12 @@ export async function ingestHealth(alias: string, b: HealthBatch) {
         stepsBefore: (b.steps ?? []).length ? stepsBefore : null,
         workoutEveningMin: (b.exercise ?? []).length ? workoutEvening : null,
         usualBedtimeMin: usualBed,
+        offsetMin,
       });
-      // Quality is relative to THIS person's own nights.
+      // Quality: the person's own rating when they gave one; otherwise relative to THEIR own nights.
       const z = (s.hasStages && Number.isFinite(deepMed) ? (s.deep - deepMed) / deepSd : 0) + (s.durationMin - durMed) / durSd;
-      const quality = z < -0.6 ? "bad" : "good";
-      const summary = `${Math.round(s.durationMin / 6) / 10} h sleep${s.hasStages ? `, ${Math.round(s.deep)} min deep, ${Math.round(s.rem)} min REM` : ""}${rhrNight ? `, resting HR ${rhrNight}` : ""}`;
+      const quality = s.n.quality ?? (z < -0.6 ? "bad" : "good");
+      const summary = `${b.label ? `${b.label}: ` : ""}${Math.round(s.durationMin / 6) / 10} h sleep${s.hasStages ? `, ${Math.round(s.deep)} min deep, ${Math.round(s.rem)} min REM` : ""}${rhrNight ? `, resting HR ${rhrNight}` : ""}`;
       await w.openEpisode(alias, { id, kind: "sleep", bands, summary, trigger: "health_connect", start: s.n.start });
       await w.closeEpisode(alias, id, Number(z.toFixed(2)), quality);
       out.newNights++;

@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { get, post, subscribe, PERSON_COLORS, type FeedEvent, type Graph } from "./api";
 import { GraphView } from "./components/GraphView";
-import { Board, DecisionCard, EvidenceBars, Feed, Room, type Device } from "./components/Panels";
+import { AskBox, Board, DecisionCard, EvidenceBars, Feed, Room, ScientistReport, type Device } from "./components/Panels";
 import { HrChart, type Series } from "./components/HrChart";
 
 interface PersonState {
   alias: string;
   devices: string[];
   present: boolean;
+  dataset?: string | null;
 }
 
 export default function App() {
@@ -24,6 +25,14 @@ export default function App() {
   const [board, setBoard] = useState<any[]>([]);
   const [stats, setStats] = useState<Record<string, { nodes: number; edges: number }>>({});
   const [flash, setFlash] = useState<Set<string>>(new Set());
+  const [report, setReport] = useState<{ r: any; chains: any[] } | null>(null);
+
+  const runScientist = useCallback(async (alias: string) => {
+    const r = await post(`/api/scientist/${alias}`);
+    const why = await get(`/api/tool/${alias}/why_bad_night`).catch(() => null);
+    setReport({ r, chains: why?.chains ?? [] });
+    setTab(alias);
+  }, []);
   const hr = useRef<Record<string, { t: number; v: number }[]>>({});
   const [, tick] = useState(0);
 
@@ -118,7 +127,7 @@ export default function App() {
           </span>
           <span className="spacer" />
           {people.map((p) => (
-            <button key={p.alias} onClick={() => post(`/api/scientist/${p.alias}`).then(refreshGraph)}>
+            <button key={p.alias} onClick={() => runScientist(p.alias).then(refreshGraph)}>
               Run Scientist · {p.alias}
             </button>
           ))}
@@ -133,6 +142,7 @@ export default function App() {
             {people.map((p, i) => (
               <div className="person" key={p.alias} style={{ ["--c" as any]: PERSON_COLORS[i % 3] }}>
                 <div className="name">{p.alias}</div>
+                {p.dataset && <div className="dataset">public dataset · {p.dataset} · not in the home</div>}
                 <div className="kv">
                   devices <b>{p.devices.length ? p.devices.join(", ") : "—"}</b>
                 </div>
@@ -150,7 +160,14 @@ export default function App() {
           </div>
           <div className="card">
             <h2>Heart rate · live</h2>
-            <HrChart series={series} />
+            <HrChart series={series.filter((s) => !people.find((p) => p.alias === s.name)?.dataset)} />
+          </div>
+          <div className="card">
+            <h2>Ask HomeOS</h2>
+            <AskBox
+              people={people.map((p) => p.alias)}
+              onAsk={(alias, text) => post(`/api/ask/${alias}`, { text, speak: false, channel: "dashboard" })}
+            />
           </div>
           <div className="card grow">
             <h2>Coordination board · tasks & handoffs</h2>
@@ -185,8 +202,12 @@ export default function App() {
 
         <div className="col">
           <div className="card">
-            <h2>Latest decision · why</h2>
-            <DecisionCard d={decision?.d} owner={decision?.owner ?? ""} />
+            <h2>{report ? "Scientist · graph algorithms" : "Latest decision · why"}</h2>
+            {report ? (
+              <ScientistReport r={report.r} chains={report.chains} onClose={() => setReport(null)} />
+            ) : (
+              <DecisionCard d={decision?.d} owner={decision?.owner ?? ""} />
+            )}
           </div>
           <div className="card">
             <h2>

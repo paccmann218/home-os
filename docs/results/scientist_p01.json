@@ -1,0 +1,153 @@
+{
+  "source": "PMData participant p01 (Thambawita et al., MMSys '20, CC BY 4.0), 150 nights, 137 self-rated (38 bad)",
+  "ms": 64,
+  "insights": [
+    "Top driver of bad nights: sleep_window:short \u2014 30 of 63 such nights were bad (48%), 1.6\u00d7 p01's usual rate (PageRank 0.03)",
+    "Keystone deviation: sleep_window:short sits on the most cause chains (betweenness 138, 1.6\u00d7 risk)",
+    "p01's bad nights come in 3 kinds: sleep_window:short + bedtime:late (23); rhr:elevated + evening_workout:yes (9); steps:high + evening_workout:yes (6)"
+  ],
+  "drivers": [
+    {
+      "band": "sleep_window:short",
+      "score": 0.0295460559427738,
+      "p_bad": 0.476923076923077,
+      "lift": 1.62587412587413,
+      "nights": 63,
+      "bad_nights": 30
+    },
+    {
+      "band": "rhr:elevated",
+      "score": 0.0295460559427738,
+      "p_bad": 0.315789473684211,
+      "lift": 1.07655502392344,
+      "nights": 55,
+      "bad_nights": 17
+    },
+    {
+      "band": "evening_workout:yes",
+      "score": 0.0225616581737995,
+      "p_bad": 0.391304347826087,
+      "lift": 1.33399209486166,
+      "nights": 44,
+      "bad_nights": 17
+    },
+    {
+      "band": "bedtime:late",
+      "score": 0.0161717496812344,
+      "p_bad": 0.294117647058824,
+      "lift": 1.00267379679144,
+      "nights": 15,
+      "bad_nights": 4
+    },
+    {
+      "band": "rhr:low",
+      "score": 0.00361981522291899,
+      "p_bad": 0.666666666666667,
+      "lift": 2.27272727272727,
+      "nights": 1,
+      "bad_nights": 1
+    }
+  ],
+  "keystone": [
+    {
+      "band": "steps:high",
+      "score": 148,
+      "p_bad": 0.26984126984127,
+      "lift": 0.91991341991342
+    },
+    {
+      "band": "sleep_window:short",
+      "score": 138,
+      "p_bad": 0.476923076923077,
+      "lift": 1.62587412587413
+    },
+    {
+      "band": "evening_workout:yes",
+      "score": 108,
+      "p_bad": 0.391304347826087,
+      "lift": 1.33399209486166
+    },
+    {
+      "band": "bedtime:late",
+      "score": 40,
+      "p_bad": 0.294117647058824,
+      "lift": 1.00267379679144
+    },
+    {
+      "band": "bedtime:early",
+      "score": 10,
+      "p_bad": 0.25,
+      "lift": 0.852272727272727
+    }
+  ],
+  "bad_night_kinds": [
+    {
+      "communityId": 93,
+      "size": 23,
+      "signature": [
+        "sleep_window:short",
+        "bedtime:late"
+      ],
+      "shares": [
+        1,
+        0.173913043478261
+      ]
+    },
+    {
+      "communityId": 101,
+      "size": 9,
+      "signature": [
+        "rhr:elevated",
+        "evening_workout:yes"
+      ],
+      "shares": [
+        1,
+        0.777777777777778
+      ]
+    },
+    {
+      "communityId": 98,
+      "size": 6,
+      "signature": [
+        "steps:high",
+        "evening_workout:yes"
+      ],
+      "shares": [
+        1,
+        0.666666666666667
+      ]
+    }
+  ],
+  "why_last_bad_night": {
+    "episode": "sleep-p01-1585272420000",
+    "chains": [
+      {
+        "chain": [
+          "sleep-p01-1585272420000",
+          "sleep_window:short",
+          "sleep_window"
+        ],
+        "pathWeight": 0.740400065410491,
+        "likelihood": 0.476923076923077
+      },
+      {
+        "chain": [
+          "sleep-p01-1585272420000",
+          "bedtime:late",
+          "bedtime"
+        ],
+        "pathWeight": 1.22377543162212,
+        "likelihood": 0.294117647058824
+      },
+      {
+        "chain": [
+          "sleep-p01-1585272420000",
+          "day:weekend_night",
+          "day"
+        ],
+        "pathWeight": 5.94098334446453,
+        "likelihood": 0.00262944273135043
+      }
+    ]
+  }
+}

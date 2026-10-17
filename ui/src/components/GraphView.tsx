@@ -43,6 +43,12 @@ export function GraphView({ graph, highlight }: { graph: Graph | null; highlight
     return { nodes: [...nodes.values()], links: [...links.values()] };
   }, [graph, highlight]);
 
+  // Fit the whole graph into view whenever the data changes (and once the layout has settled).
+  useEffect(() => {
+    const t = setTimeout(() => fg.current?.zoomToFit(400, 40), 1200);
+    return () => clearTimeout(t);
+  }, [data, size.w, size.h]);
+
   const hasHi = hiNodes.size > 0;
   return (
     <div className="graphbox" ref={box}>

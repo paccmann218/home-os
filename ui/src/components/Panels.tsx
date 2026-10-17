@@ -153,3 +153,98 @@ export function DecisionCard({ d, owner }: { d: any; owner: string }) {
     </div>
   );
 }
+
+/** Ask HomeOS as any person (same Coach + MCP tools as the watch; reply shown here, not spoken). */
+export function AskBox({ people, onAsk }: { people: string[]; onAsk: (alias: string, text: string) => Promise<{ reply: string; tools: string[] }> }) {
+  const [who, setWho] = useState(people[0] ?? "");
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [answer, setAnswer] = useState<{ q: string; reply: string; tools: string[] } | null>(null);
+  const alias = people.includes(who) ? who : people[0] ?? "";
+  const send = async () => {
+    if (!text.trim() || !alias) return;
+    setBusy(true);
+    const q = text;
+    setText("");
+    try {
+      const r = await onAsk(alias, q);
+      setAnswer({ q, reply: r.reply, tools: r.tools ?? [] });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div>
+      <input
+        className="input"
+        style={{ width: "100%" }}
+        placeholder="Why did I sleep badly? What helps me when I'm sick?"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && send()}
+      />
+      <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+        <select value={alias} onChange={(e) => setWho(e.target.value)} className="input" style={{ flex: 1, minWidth: 0 }}>
+          {people.map((p) => (
+            <option key={p}>{p}</option>
+          ))}
+        </select>
+        <button className="primary" disabled={busy} onClick={send}>
+          {busy ? "Thinking…" : "Ask"}
+        </button>
+      </div>
+      {answer && (
+        <div style={{ marginTop: 8 }}>
+          <div className="muted" style={{ fontSize: 11 }}>
+            {alias}: “{answer.q}”
+          </div>
+          <div style={{ marginTop: 4, lineHeight: 1.4 }}>{answer.reply}</div>
+          {answer.tools.length > 0 && (
+            <div style={{ marginTop: 4 }}>
+              {answer.tools.map((t, i) => (
+                <span className="tag" key={i}>
+                  {t}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The Scientist's latest report for a person: algorithm insights + most likely cause chains. */
+export function ScientistReport({ r, chains, onClose }: { r: any; chains: any[]; onClose: () => void }) {
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+        <span className="muted" style={{ fontSize: 11 }}>
+          {r.alias} · {r.ms} ms over the full history
+        </span>
+        <span className="spacer" />
+        <button style={{ padding: "2px 8px", fontSize: 10 }} onClick={onClose}>
+          close
+        </button>
+      </div>
+      {r.insights.map((t: string, i: number) => (
+        <div key={i} style={{ margin: "6px 0", lineHeight: 1.35 }}>
+          <span className="tag">{["pageRank", "betweenness", "labelPropagation"][i] ?? "insight"}</span> {t}
+        </div>
+      ))}
+      {chains.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <div className="muted" style={{ fontSize: 11, marginBottom: 4 }}>
+            Why the last bad night? algo.SPpaths over −ln P(bad | deviation)
+          </div>
+          {chains.map((c: any, i: number) => (
+            <div key={i} className="rej">
+              <b>{c.chain.slice(1).join(" → ")}</b> — likelihood {Number(c.likelihood).toFixed(2)}
+            </div>
+          ))}
+        </div>
+      )}
+      {r.playbookChanges?.length > 0 && <div className="privacy">Playbooks updated: {r.playbookChanges.join(", ")}</div>}
+    </div>
+  );
+}

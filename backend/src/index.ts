@@ -27,6 +27,7 @@ import { runScientist } from "./agents/scientist.js";
 import { ask } from "./agents/coach.js";
 import { toolByName } from "./tools/index.js";
 import { record } from "./replay/recorder.js";
+import { toolbox } from "./llm/agent.js";
 
 const app = express();
 app.use(express.json({ limit: "25mb" }));
@@ -43,6 +44,12 @@ bus.on("feed", (e: FeedEvent) => {
   if (feed.length > 300) feed.shift();
   console.log(`[${new Date(e.at).toLocaleTimeString()}] ${e.agent}${e.person ? ` (${e.person})` : ""}: ${e.text}`);
 });
+
+/** Record a real input for replay mode; requests marked as tests (x-homeos-test) are never recorded. */
+const rec = (req: express.Request, kind: string, body: unknown) => {
+  // Tests and dataset imports (x-homeos-import; the converted dataset lives in replay/datasets) are not session recordings.
+  if (!req.headers["x-homeos-test"] && !req.headers["x-homeos-import"]) record(kind, String(req.params.alias), body);
+};
 
 const person = (req: express.Request) => {
   const a = String(req.params.alias);
@@ -71,7 +78,12 @@ app.get(
     return {
       graphEnabled: config.graphEnabled,
       voice: voiceEnabled(),
-      people: config.people.map((p) => ({ alias: p, devices: connected(p), present: present.some((x) => x.alias === p) })),
+      people: config.people.map((p) => ({
+        alias: p,
+        devices: connected(p),
+        present: present.some((x) => x.alias === p),
+        dataset: config.datasetPeople.includes(p) ? "PMData (Thambawita et al., 2020), CC BY 4.0" : null,
+      })),
       devices,
       live: snapshot(),
       feed: feed.slice(-80),
@@ -79,12 +91,12 @@ app.get(
   }),
 );
 
-app.post("/api/chip/:alias", wrap(async (req) => (record("chip", person(req), req.body), handleChip(person(req), String(req.body.chip), String(req.body.source ?? "app")))));
-app.post("/api/ask/:alias", wrap(async (req) => (record("ask", person(req), req.body), ask(person(req), String(req.body.text), { lang: req.body.lang, channel: req.body.channel ?? "app", speak: req.body.speak !== false }))));
-app.post("/api/prompt/:alias", wrap(async (req) => (record("prompt", person(req), req.body), answerPrompt(person(req), String(req.body.id), String(req.body.answer)))));
+app.post("/api/chip/:alias", wrap(async (req) => (rec(req, "chip", req.body), handleChip(person(req), String(req.body.chip), String(req.body.source ?? "app")))));
+app.post("/api/ask/:alias", wrap(async (req) => (rec(req, "ask", req.body), ask(person(req), String(req.body.text), { lang: req.body.lang, channel: req.body.channel ?? "app", speak: req.body.speak !== false }))));
+app.post("/api/prompt/:alias", wrap(async (req) => (rec(req, "prompt", req.body), answerPrompt(person(req), String(req.body.id), String(req.body.answer)))));
 app.post("/api/presence/:alias", wrap(async (req) => w.setPresence(person(req), Boolean(req.body.present))));
-app.post("/api/hr/:alias", wrap(async (req) => (record("hr", person(req), req.body), pushHr(person(req), { t: req.body.t ?? now(), hr: Number(req.body.hr), ibi: req.body.ibi }))));
-app.post("/api/health/:alias", wrap(async (req) => (record("health", person(req), req.body), ingestHealth(person(req), req.body))));
+app.post("/api/hr/:alias", wrap(async (req) => (rec(req, "hr", req.body), pushHr(person(req), { t: req.body.t ?? now(), hr: Number(req.body.hr), ibi: req.body.ibi }))));
+app.post("/api/health/:alias", wrap(async (req) => (rec(req, "health", req.body), ingestHealth(person(req), req.body))));
 app.post("/api/scientist/:alias", wrap(async (req) => runScientist(person(req))));
 app.post(
   "/api/audio/:alias",
@@ -93,6 +105,7 @@ app.post(
     const buf = Buffer.isBuffer(req.body) ? req.body : Buffer.from(String(req.body.wav_base64 ?? ""), "base64");
     const stt = await transcribe(buf, req.headers["content-type"]?.startsWith("audio/") ? req.headers["content-type"] : "audio/wav");
     if (!stt.text) return { heard: "", reply: "" };
+    rec(req, "ask", { text: stt.text, lang: stt.lang, channel: "voice" });
     const r = await ask(alias, stt.text, { lang: stt.lang, channel: "watch-voice" });
     return { heard: stt.text, ...r };
   }),
@@ -169,7 +182,7 @@ app.post(
   "/api/reset",
   wrap(async () => {
     await setupAll({ reset: true });
-    for (const p of config.people) await w.setPresence(p, true);
+    for (const p of config.people) await w.setPresence(p, !config.datasetPeople.includes(p));
     return { reset: true };
   }),
 );
@@ -232,6 +245,7 @@ deviceWss.on("connection", (ws: WebSocket, req: http.IncomingMessage) => {
       else if (m.type === "audio") {
         const stt = await transcribe(Buffer.from(String(m.wav_base64), "base64"));
         ws.send(JSON.stringify({ type: "heard", text: stt.text }));
+        if (stt.text) record("ask", alias, { text: stt.text, lang: stt.lang, channel: "voice" });
         if (stt.text) await ask(alias, stt.text, { lang: stt.lang, channel: `${kind}-voice` });
       }
     } catch (e) {
@@ -261,7 +275,7 @@ process.on("uncaughtException", (e) => console.warn("[uncaught]", e.message));
 async function main() {
   if (config.graphEnabled) {
     await setupAll({ reset: process.argv.includes("--reset") });
-    for (const p of config.people) await w.setPresence(p, true);
+    for (const p of config.people) await w.setPresence(p, !config.datasetPeople.includes(p));
     startReclaimer();
     startArbiter();
     startEvaluator();
@@ -271,6 +285,8 @@ async function main() {
     }
   }
   startRoomPolling();
+  // Start each person's MCP toolbox now so the first question isn't slowed by process start-up.
+  if (config.graphEnabled) for (const p of config.people) void toolbox(p).catch((e) => console.warn(`[mcp:${p}]`, (e as Error).message));
   server.listen(config.server.port, "0.0.0.0", () => {
     console.log(`HomeOS backend on http://0.0.0.0:${config.server.port}  graph=${config.graphEnabled ? "on" : "OFF (ablation)"}  voice=${voiceEnabled() ? "sarvam" : "device TTS"}`);
     console.log(`  watch/phone WS: ws://<laptop-ip>:${config.server.port}/ws/device?alias=<${config.people.join("|")}>&kind=watch`);

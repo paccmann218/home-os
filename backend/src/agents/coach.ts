@@ -37,7 +37,7 @@ You answer from the graph: ALWAYS call tools before answering about their body, 
 - If they state a lasting preference or dislike, call set_preference / set_dislike.
 - For any other question about the shared home (devices, rooms, who is present, past arbitrations, tasks), use the official FalkorDB tools: call falkordb__get_graph_schema on graph "home:flat1" first, then falkordb__query_graph_readonly with Cypher that matches that schema.
 Privacy: other people's limits appear as "someone present" - never guess who or why. Never reveal another person's data.
-Wellness only, not medical advice. Reply in 1-2 short spoken sentences, no markdown, no lists. Match their language (English, Hindi or Hinglish).`;
+Wellness only, not medical advice. Your reply is SPOKEN on a watch: at most 2 short sentences and 30 words, no markdown, no lists, no numbers they didn't ask for. Match their language (English, Hindi or Hinglish).`;
 
 function aboutRefs(trace: { tool: string; result: string }[]): string[] {
   const refs = new Set<string>();
@@ -63,8 +63,9 @@ export async function ask(alias: string, text: string, opts: { lang?: string; ch
     await handleChip(alias, chip, opts.channel ?? "voice");
     return { reply: "", tools: [] };
   }
-  await w.addTurn(alias, { session, role: "user", text, lang: opts.lang, channel: opts.channel });
+  // Memory writes (with embeddings) run alongside the LLM instead of in front of it.
   const history = (await bodyRead(alias, "recent_turns", { limit: 6 })).reverse();
+  const userTurn = w.addTurn(alias, { session, role: "user", text, lang: opts.lang, channel: opts.channel });
   let reply = "Sorry, I can't reach my reasoning service right now.";
   let trace: { tool: string; args: unknown; result: string }[] = [];
   if (llmAvailable()) {
@@ -73,7 +74,7 @@ export async function ask(alias: string, text: string, opts: { lang?: string; ch
       system: SYSTEM(alias),
       maxSteps: 6,
       messages: [
-        ...history.slice(0, -1).map((h) => ({ role: (h.role === "user" ? "user" : "assistant") as "user" | "assistant", content: String(h.text) })),
+        ...history.map((h) => ({ role: (h.role === "user" ? "user" : "assistant") as "user" | "assistant", content: String(h.text) })),
         { role: "user", content: text },
       ],
       onTool: (t) => bus.feed({ agent: `coach:${alias}`, kind: "tool", person: alias, text: `MCP tool → ${t.tool}`, data: { args: t.args } }),
@@ -92,7 +93,9 @@ export async function ask(alias: string, text: string, opts: { lang?: string; ch
       }
     }
   }
-  await w.addTurn(alias, { session, role: "assistant", text: reply, lang: opts.lang, channel: opts.channel, about: aboutRefs(trace) });
+  // Speak first; then persist the answer as conversation memory.
   if (opts.speak !== false) await say(alias, reply, { lang: opts.lang });
+  await userTurn;
+  await w.addTurn(alias, { session, role: "assistant", text: reply, lang: opts.lang, channel: opts.channel, about: aboutRefs(trace) });
   return { reply, tools: trace.map((t) => t.tool) };
 }

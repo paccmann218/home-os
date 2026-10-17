@@ -1,0 +1,3 @@
+{"t":1792243106503,"kind":"health","person":"shashwath","data":{"source":"health_connect","days":2,"granted_permissions":9,"origins":[],"errors":{},"sleep":[],"heart_rate":[],"resting_hr":[],"hrv":[],"steps":[],"exercise":[],"vo2max":[]}}
+{"t":1792243201048,"kind":"onbody","person":"harsh","data":{"type":"onbody","on":true}}
+{"t":1792243202633,"kind":"onbody","person":"harsh","data":{"type":"onbody","on":false}}

@@ -30,7 +30,7 @@ Every row points to the code and the Cypher that does the work. Full write-ups: 
 | Official focus | What HomeOS does | Where (code · Cypher) |
 |---|---|---|
 | **Multi-hop reasoning** | Arbitration walks Room → Device -CONTROLS→ Var -AFFECTS→ Signal, and Room ←IN- Person -HAS_CONSTRAINT→ Constraint, then resolves conflicting ranges by priority (`HomeOS.resolveRanges` UDF). A person's needs come from Person → Condition -IMPLIES*0..3→ Condition -SHIFTS→ Var. | [`feasible_settings.cypher`](graph/queries/feasible_settings.cypher) · [`effective_comfort.cypher`](graph/queries/effective_comfort.cypher) · [`agents/arbiter.ts`](backend/src/agents/arbiter.ts) |
-| **Graph queries & algorithms as agent tools** | 19 typed tools over MCP. They include `why_bad_night` (**algo.SPpaths** over −ln p weights), `drivers` (**algo.pageRank**), `keystone` (**algo.betweenness**), `episode_types` (**algo.labelPropagation**), `impact` (**algo.bfs**) and `similar_episodes` (**vector index** + shared bands). | [`tools/index.ts`](backend/src/tools/index.ts) · [`why_bad_night.cypher`](graph/queries/why_bad_night.cypher) · [`drivers.cypher`](graph/queries/drivers.cypher) |
+| **Graph queries & algorithms as agent tools** | 19 typed tools over MCP. They include `why_bad_night` (**algo.SPpaths** over −ln p weights), `drivers` (**algo.pageRank**), `keystone` (**algo.betweenness**), `episode_types` (**algo.labelPropagation**), `impact` (**algo.bfs**) and `similar_episodes` (**vector index** + shared bands). On 150 real nights the full analysis takes 64 ms ([results](#real-data-results-the-scientist)). | [`tools/index.ts`](backend/src/tools/index.ts) · [`why_bad_night.cypher`](graph/queries/why_bad_night.cypher) · [`drivers.cypher`](graph/queries/drivers.cypher) |
 | **Tool selection through MCP** | Each person's agents attach to **homeos-mcp** (our server, scoped to that person's ACL user) and the **official FalkorDB MCP server** (read-only, `home_reader` user). Azure OpenAI chooses among both sets of tools. | [`mcp/server.ts`](backend/src/mcp/server.ts) · [`llm/agent.ts`](backend/src/llm/agent.ts) |
 | **Actions based on graph results** | AC, fan, light and the watch's breathing pacer are driven only by `choose_intervention` (Evidence + Thompson-sampling UDF) clamped by `feasible_settings`, then applied under an atomic device lease. | [`choose_intervention.cypher`](graph/queries/choose_intervention.cypher) · [`agents/planner.ts`](backend/src/agents/planner.ts) · [`acquire_device.cypher`](graph/queries/acquire_device.cypher) |
 | **Explainable results** | Every Decision stores its provenance: context bands, chosen and rejected options with reasons, evidence used (n, mean) and the constraints that bounded it. `explain` walks it. The owner sees their private reasons; everyone else sees "someone present". | [`explain.cypher`](graph/queries/explain.cypher) · [`explain_arbitration.cypher`](graph/queries/explain_arbitration.cypher) · [`explain_paths.cypher`](graph/queries/explain_paths.cypher) |
@@ -57,6 +57,23 @@ The same two-person scenario was run with `HOMEOS_GRAPH=on` and with FalkorDB re
 | Bob finishes a workout | AC **stays 27 °C** (Alice's floor wins by priority); Bob gets the fan at level 1 plus a 5.5/min pacer | AC dropped to **22 °C** on a sick person |
 | Bob: "why not colder?" | "someone present bounds it… your post-workout range had to stay within the shared limit" | "I don't have any memory…" |
 | Alice: "what helps me when I'm sick?" | warmer AC, fan off, warm dim light, from her evidence and playbook | "I don't have any memory…" |
+
+---
+
+## Real-data results: the Scientist
+
+The team's ring had almost no history before the event: the Gabit → Health Connect → HomeOS Bridge pipeline is verified end to end, but there was little to sync. So HomeOS also loads one participant of the public **PMData** dataset (Fitbit Versa 2, Nov 2019 – Mar 2020, CC BY 4.0, [attribution](replay/datasets/README.md)) as a separate, clearly labelled household member `p01` who is never in the home. Nothing is synthesised: 150 real nights, 137 rated by the participant (38 rated bad).
+
+The Scientist works on *deviations from the person's own normal*: bands such as `sleep_window:short` or `rhr:elevated` carry the `:Notable` label, and everyday context does not. Output on p01 ([`docs/results/scientist_p01.json`](docs/results/scientist_p01.json), 64 ms):
+
+| Algorithm | Finding |
+|---|---|
+| `algo.pageRank` over deviations co-occurring on bad nights | **Top driver: short sleep window.** 30 of 63 such nights were rated bad (48%), 1.6× p01's usual rate |
+| `algo.betweenness` on episode → deviation → lever | Keystone deviation: short sleep window (most cause chains run through it) |
+| `algo.labelPropagation` over bad nights + deviations | Bad nights come in **3 kinds**: short window + late bedtime (23) · elevated resting HR + evening workout (9) · very active day + evening workout (6) |
+| `algo.SPpaths` over −ln P(bad \| deviation) | Last bad night: short sleep window (likelihood 0.48), then late bedtime (0.29) |
+
+Asked "What usually ruins my nights?", the Coach chose `drivers`, `keystone` and `what_works` through MCP and answered: *"Mostly short sleep windows, evening workouts, and elevated resting heart rate."*
 
 ---
 
@@ -137,6 +154,12 @@ cp .env.example .env              # fill in Azure (and optionally Sarvam) keys
 docker compose up -d --build      # FalkorDB + Browser (:3000) + HomeOS backend & dashboard (:3001)
 ```
 
+Load the public-dataset person (months of real nights for the Scientist):
+
+```bash
+cd backend && npx tsx scripts/import-pmdata.ts --batch ../replay/datasets/pmdata-p01.json --alias p01
+```
+
 Without hardware, replay a recorded real session ([`replay/README.md`](replay/README.md)):
 
 ```bash
@@ -163,8 +186,8 @@ Connect any MCP client (Claude Desktop, Cursor, …) to a person's memory:
 
 | Device | App | Notes |
 |---|---|---|
-| Samsung Galaxy Watch4 (SM-R865F, Wear OS 5) | [`apps/watch`](apps/watch) (Kotlin, Compose for Wear OS) | HR via Health Services; IBI/HRV via the Samsung Health Sensor SDK when its AAR is present; chips, push-to-talk (Sarvam or on-device speech), spoken replies, haptic breathing pacer. Set `homeos.ws` and `homeos.alias` in `apps/watch/local.properties`, then `./gradlew installDebug` |
-| Gabit smart ring | [`apps/phone`](apps/phone) "HomeOS Bridge" (Kotlin, Health Connect) | Gabit writes sleep stages, HR, resting HR, steps and VO2max to Health Connect. The app backfills 120 days and syncs every 15 minutes in the background |
+| Samsung Galaxy Watch4 (SM-R865F, Wear OS 5) | [`apps/watch`](apps/watch) (Kotlin, Compose for Wear OS) | HR via Health Services; IBI/HRV via the Samsung Health Sensor SDK when its AAR is present; chips; push-to-talk with **Sarvam** speech-to-text (`saaras:v3`, code-mixed Hindi/English) and spoken replies (`bulbul:v3`), about 6–9 s from question to voice; haptic breathing pacer. Set `homeos.ws` and `homeos.alias` in `apps/watch/local.properties`, then `./gradlew installDebug` |
+| Gabit smart ring | [`apps/phone`](apps/phone) "HomeOS Bridge" (Kotlin, Health Connect) | Gabit holds Health Connect write permission for HR, HRV, resting HR, sleep, steps, exercise and VO2max (verified on the phone). The app backfills 120 days, syncs every 15 minutes in the background, reports per-type read errors, and can be triggered from a laptop: `adb shell am broadcast -n com.homeos.bridge/.SyncReceiver --el days 120` |
 | ESP32 room node | [`esphome/room-node.yaml`](esphome/room-node.yaml) | DHT11 temperature/humidity, light sensor, dimmable LED as the room light (`ESP32_HOST`) |
 | Philips WiZ bulb | — | local UDP (`WIZ_HOST`) |
 | AC and fan | — | virtual devices on the dashboard behind the same driver interface (an IR blaster driver plugs in here) |
@@ -194,5 +217,5 @@ graph/       schema seeds, 59 queries (.cypher), UDF library, catalog of conditi
 backend/     TypeScript: agents, write API, MCP server, ingest, device drivers, Sarvam voice, tests, scripts
 ui/          React dashboard (live agents, decisions, provenance graph, evidence)
 apps/watch/  Wear OS app          apps/phone/  Health Connect bridge
-replay/      recorded real sessions + README       docs/  track write-ups, results
+replay/      recorded real sessions, public dataset (PMData p01) + README       docs/  track write-ups, results
 ```

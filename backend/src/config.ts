@@ -19,7 +19,13 @@ export const config = {
   },
   homeId: env("HOMEOS_HOME", "flat1"),
   // People in the household. Each gets a private body:<alias> graph.
-  people: env("HOMEOS_PEOPLE", "harsh,shashwath").split(",").map((s) => s.trim()).filter(Boolean),
+  people: [
+    ...env("HOMEOS_PEOPLE", "harsh,shashwath").split(",").map((s) => s.trim()).filter(Boolean),
+    ...env("HOMEOS_DATASET_PEOPLE", "").split(",").map((s) => s.trim()).filter(Boolean),
+  ].filter((p, i, a) => a.indexOf(p) === i),
+  // People whose memory comes from an imported public dataset (e.g. PMData). They have a private
+  // graph like everyone else but are never present in the home and never control devices.
+  datasetPeople: env("HOMEOS_DATASET_PEOPLE", "").split(",").map((s) => s.trim()).filter(Boolean),
   // Ablation switch: HOMEOS_GRAPH=off runs the fixed-rule fallback with no FalkorDB.
   graphEnabled: env("HOMEOS_GRAPH", "on") !== "off",
   azure: {
