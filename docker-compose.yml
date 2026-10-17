@@ -40,6 +40,8 @@ services:
     environment:
       FALKORDB_HOST: falkordb
       FALKORDB_PORT: "6379"
+      # Public-dataset person whose real history (replay/datasets) is loaded on first start.
+      HOMEOS_DATASET_PEOPLE: "${HOMEOS_DATASET_PEOPLE:-p01}"
     ports:
       - "3001:3001"   # dashboard + API + watch/phone WebSocket
     restart: unless-stopped

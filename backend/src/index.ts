@@ -269,6 +269,20 @@ uiWss.on("connection", (ws: WebSocket) => {
   ws.on("close", () => handlers.forEach(([ev, h]) => bus.off(ev, h)));
 });
 
+/** Dataset people (e.g. PMData p01) get their committed history on first start, so a fresh
+ *  `docker compose up` already has months of real nights for the Scientist. */
+async function loadDatasetPeople() {
+  for (const alias of config.datasetPeople) {
+    const file = path.join(REPO_ROOT, "replay", "datasets", `pmdata-${alias}.json`);
+    if (!fs.existsSync(file)) continue;
+    const [row] = await run(bodyGraph(alias), "MATCH (e:Episode) RETURN count(e) AS n", {}, { as: agentUser(alias), readOnly: true });
+    if ((row?.n ?? 0) > 0) continue;
+    const r = await ingestHealth(alias, JSON.parse(fs.readFileSync(file, "utf8")));
+    console.log(`[dataset] loaded ${alias}: ${r.newNights} nights from ${path.basename(file)}`);
+    await runScientist(alias).catch((e) => console.warn(`[dataset] scientist ${alias}:`, (e as Error).message));
+  }
+}
+
 // ---------- start ----------
 process.on("unhandledRejection", (e) => console.warn("[unhandled]", (e as Error)?.message ?? e));
 process.on("uncaughtException", (e) => console.warn("[uncaught]", e.message));
@@ -276,6 +290,7 @@ async function main() {
   if (config.graphEnabled) {
     await setupAll({ reset: process.argv.includes("--reset") });
     for (const p of config.people) await w.setPresence(p, !config.datasetPeople.includes(p));
+    await loadDatasetPeople();
     startReclaimer();
     startArbiter();
     startEvaluator();

@@ -75,6 +75,15 @@ export default function App() {
       .catch(() => undefined);
   }, [refreshState, showDecision]);
 
+  // Deep links for demos/screenshots: ?scientist=p01 opens that person's Scientist report, ?tab=home|<alias>.
+  useEffect(() => {
+    const q = new URLSearchParams(location.search);
+    const sci = q.get("scientist");
+    if (sci) runScientist(sci).catch(() => undefined);
+    const t = q.get("tab");
+    if (t) setTab(t);
+  }, [runScientist]);
+
   useEffect(() => {
     refreshGraph().catch(() => undefined);
     const h = setInterval(() => refreshGraph().catch(() => undefined), 6000);
