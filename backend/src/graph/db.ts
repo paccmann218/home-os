@@ -84,14 +84,14 @@ export async function rawCommand(args: string[]): Promise<unknown> {
 }
 
 export async function closeAll(): Promise<void> {
-  for (const c of clients.values()) {
-    try {
-      await (await c).close();
-    } catch {
-      /* already closed */
-    }
-  }
+  const pending = [...clients.values()];
   clients.clear();
+  // A client whose socket died (e.g. FalkorDB restarted) must not hang shutdown.
+  await Promise.all(
+    pending.map((c) =>
+      Promise.race([c.then((db) => db.close()).catch(() => undefined), new Promise((r) => setTimeout(r, 2000))]),
+    ),
+  );
 }
 
 export const now = () => Date.now();

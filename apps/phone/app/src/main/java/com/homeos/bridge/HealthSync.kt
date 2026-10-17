@@ -26,8 +26,9 @@ import kotlin.reflect.KClass
 
 /**
  * Reads the ring's data from Health Connect (Gabit writes sleep stages, heart rate, resting HR,
- * steps, VO2max; Samsung Health may add more) and posts it to the HomeOS backend, which turns
- * every night into a sleep Episode in the person's private FalkorDB graph.
+ * HRV, steps, VO2max) and posts it to the HomeOS backend, which turns every night into a sleep
+ * Episode in the person's private FalkorDB graph. Read failures are reported, never hidden, so an
+ * empty sync can be told apart from a broken one.
  */
 object HealthSync {
     val PERMISSIONS = setOf(
@@ -57,7 +58,14 @@ object HealthSync {
         return out
     }
 
-    private suspend fun <T : Record> safe(block: suspend () -> List<T>): List<T> = runCatching { block() }.getOrElse { emptyList() }
+    /** Read one record type; a failure is recorded in [errors] instead of silently becoming "no data". */
+    private suspend fun <T : Record> safe(name: String, errors: MutableMap<String, String>, block: suspend () -> List<T>): List<T> =
+        try {
+            block()
+        } catch (e: Exception) {
+            errors[name] = "${e.javaClass.simpleName}: ${e.message}"
+            emptyList()
+        }
 
     private val STAGES = mapOf(
         SleepSessionRecord.STAGE_TYPE_DEEP to "deep",
@@ -69,21 +77,30 @@ object HealthSync {
         SleepSessionRecord.STAGE_TYPE_SLEEPING to "light",
     )
 
-    /** Read [days] of history and post it. Returns a short human summary. */
+    /** Read [days] of history and post it. Returns a short human summary (also stored as lastSync). */
     suspend fun sync(ctx: Context, baseUrl: String, alias: String, days: Long): String {
         val client = HealthConnectClient.getOrCreate(ctx)
         val to = Instant.now()
         val from = to.minus(Duration.ofDays(days))
-        val sleep = safe { readAll(client, SleepSessionRecord::class, from, to) }
-        val hr = safe { readAll(client, HeartRateRecord::class, to.minus(Duration.ofDays(minOf(days, 14L))), to) }
-        val rhr = safe { readAll(client, RestingHeartRateRecord::class, from, to) }
-        val hrv = safe { readAll(client, HeartRateVariabilityRmssdRecord::class, from, to) }
-        val steps = safe { readAll(client, StepsRecord::class, from, to) }
-        val ex = safe { readAll(client, ExerciseSessionRecord::class, from, to) }
-        val vo2 = safe { readAll(client, Vo2MaxRecord::class, from, to) }
+        val errors = linkedMapOf<String, String>()
+        val granted = runCatching { client.permissionController.getGrantedPermissions().size }.getOrDefault(-1)
+        val sleep = safe("sleep", errors) { readAll(client, SleepSessionRecord::class, from, to) }
+        val hr = safe("heart_rate", errors) { readAll(client, HeartRateRecord::class, to.minus(Duration.ofDays(minOf(days, 14L))), to) }
+        val rhr = safe("resting_hr", errors) { readAll(client, RestingHeartRateRecord::class, from, to) }
+        val hrv = safe("hrv", errors) { readAll(client, HeartRateVariabilityRmssdRecord::class, from, to) }
+        val steps = safe("steps", errors) { readAll(client, StepsRecord::class, from, to) }
+        val ex = safe("exercise", errors) { readAll(client, ExerciseSessionRecord::class, from, to) }
+        val vo2 = safe("vo2max", errors) { readAll(client, Vo2MaxRecord::class, from, to) }
+        val origins = (sleep.map { it.metadata.dataOrigin.packageName } + hr.map { it.metadata.dataOrigin.packageName } +
+            rhr.map { it.metadata.dataOrigin.packageName } + hrv.map { it.metadata.dataOrigin.packageName } +
+            steps.map { it.metadata.dataOrigin.packageName }).distinct()
 
         val body = JSONObject()
             .put("source", "health_connect")
+            .put("days", days)
+            .put("granted_permissions", granted)
+            .put("origins", JSONArray(origins))
+            .put("errors", JSONObject(errors as Map<*, *>))
             .put("sleep", JSONArray(sleep.map { s ->
                 JSONObject().put("start", s.startTime.toEpochMilli()).put("end", s.endTime.toEpochMilli())
                     .put("origin", s.metadata.dataOrigin.packageName)
@@ -100,8 +117,11 @@ object HealthSync {
 
         val req = Request.Builder().url("$baseUrl/api/health/$alias").post(body.toString().toRequestBody("application/json".toMediaType())).build()
         val resp = http.newCall(req).execute().use { it.body?.string() ?: "" }
-        val origins = sleep.map { it.metadata.dataOrigin.packageName }.distinct().joinToString()
-        return "Read ${sleep.size} nights, ${hr.sumOf { it.samples.size }} HR samples, ${rhr.size} resting HR, ${steps.size} step records" +
-            (if (origins.isNotBlank()) " (from $origins)" else "") + "\nServer: $resp"
+        return "Read ${sleep.size} nights, ${hr.sumOf { it.samples.size }} HR samples, ${rhr.size} resting HR, ${hrv.size} HRV, " +
+            "${steps.size} step records over $days d" +
+            (if (origins.isNotEmpty()) " (from ${origins.joinToString()})" else "") +
+            " · $granted permissions" +
+            (if (errors.isNotEmpty()) "\nErrors: " + errors.entries.joinToString { "${it.key}: ${it.value}" } else "") +
+            "\nServer: $resp"
     }
 }

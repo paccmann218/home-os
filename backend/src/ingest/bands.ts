@@ -24,9 +24,11 @@ export interface Context {
 
 const band = (v: string, level: string): BandSpec => ({ key: `${v}:${level}`, var: v, level });
 
-export function timeOfDay(at: number): string {
-  // IST wall clock (the demo home is in India).
-  const h = new Date(at + 5.5 * 3600_000).getUTCHours();
+/** Default wall clock: IST (the demo home is in India). Data from elsewhere passes its own offset. */
+export const IST_OFFSET_MIN = 330;
+
+export function timeOfDay(at: number, offsetMin = IST_OFFSET_MIN): string {
+  const h = new Date(at + offsetMin * 60_000).getUTCHours();
   if (h >= 5 && h < 12) return "morning";
   if (h >= 12 && h < 17) return "afternoon";
   if (h >= 17 && h < 22) return "evening";
@@ -59,11 +61,12 @@ export interface NightFacts {
   stepsBefore?: number | null;
   workoutEveningMin?: number | null;
   roomTempAvg?: number | null;
-  usualBedtimeMin?: number | null; // minutes after 18:00 IST
+  usualBedtimeMin?: number | null; // minutes after 18:00 local time
+  offsetMin?: number; // the person's UTC offset (minutes); default IST
 }
 
-export function minutesAfterSixPm(at: number): number {
-  const d = new Date(at + 5.5 * 3600_000);
+export function minutesAfterSixPm(at: number, offsetMin = IST_OFFSET_MIN): number {
+  const d = new Date(at + offsetMin * 60_000);
   let m = d.getUTCHours() * 60 + d.getUTCMinutes() - 18 * 60;
   if (m < 0) m += 24 * 60;
   return m;
@@ -71,7 +74,8 @@ export function minutesAfterSixPm(at: number): number {
 
 export function nightBands(n: NightFacts): BandSpec[] {
   const out: BandSpec[] = [band("kind", "sleep")];
-  const bed = minutesAfterSixPm(n.start);
+  const off = n.offsetMin ?? IST_OFFSET_MIN;
+  const bed = minutesAfterSixPm(n.start, off);
   const usual = n.usualBedtimeMin ?? 5 * 60; // 23:00
   out.push(band("bedtime", bed > usual + 45 ? "late" : bed < usual - 60 ? "early" : "usual"));
   out.push(band("sleep_window", n.durationMin < 360 ? "short" : n.durationMin > 540 ? "long" : "ok"));
@@ -82,7 +86,7 @@ export function nightBands(n: NightFacts): BandSpec[] {
   if (n.stepsBefore != null) out.push(band("steps", n.stepsBefore < 4000 ? "low" : n.stepsBefore > 10000 ? "high" : "ok"));
   if (n.workoutEveningMin != null) out.push(band("evening_workout", n.workoutEveningMin > 10 ? "yes" : "no"));
   if (n.roomTempAvg != null) out.push(band("room_temp", n.roomTempAvg < 24 ? "cool" : n.roomTempAvg > 27 ? "warm" : "ok"));
-  const dow = new Date(n.start + 5.5 * 3600_000).getUTCDay();
+  const dow = new Date(n.start + off * 60_000).getUTCDay();
   out.push(band("day", dow === 5 || dow === 6 ? "weekend_night" : "weeknight"));
   return dedupe(out);
 }
@@ -94,3 +98,25 @@ function dedupe(b: BandSpec[]): BandSpec[] {
   const seen = new Set<string>();
   return b.filter((x) => (seen.has(x.key) ? false : (seen.add(x.key), true)));
 }
+
+/**
+ * Each variable's "usual" levels. A band at any OTHER level is :Notable - a deviation from the
+ * person's normal (late bedtime, short sleep, elevated resting HR, ...). The Scientist's graph
+ * algorithms run on notable bands, so everyday context can't drown out real signals.
+ */
+export const DEFAULT_LEVELS: Record<string, string[]> = {
+  hr: ["normal"],
+  rmssd: ["normal"],
+  room_temp: ["ok"],
+  humidity: ["ok"],
+  lux: ["dark", "bright"],
+  tod: ["morning", "afternoon", "evening", "night"],
+  activity: ["rest"],
+  occupants: ["1", "2plus"],
+  bedtime: ["usual"],
+  sleep_window: ["ok"],
+  rhr: ["normal"],
+  steps: ["ok"],
+  evening_workout: ["no"],
+  day: ["weeknight", "weekend_night"],
+};

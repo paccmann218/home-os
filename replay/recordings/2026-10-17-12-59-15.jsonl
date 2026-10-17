@@ -1,0 +1,3 @@
+{"t":1792241955914,"kind":"health","person":"shashwath","data":{"source":"health_connect","sleep":[],"heart_rate":[],"resting_hr":[],"hrv":[],"steps":[],"exercise":[],"vo2max":[]}}
+{"t":1792242167130,"kind":"health","person":"shashwath","data":{"source":"health_connect","days":120,"granted_permissions":9,"origins":[],"errors":{},"sleep":[],"heart_rate":[],"resting_hr":[],"hrv":[],"steps":[],"exercise":[],"vo2max":[]}}
+{"t":1792242205017,"kind":"health","person":"shashwath","data":{"source":"health_connect","days":2,"granted_permissions":9,"origins":[],"errors":{},"sleep":[],"heart_rate":[],"resting_hr":[],"hrv":[],"steps":[],"exercise":[],"vo2max":[]}}

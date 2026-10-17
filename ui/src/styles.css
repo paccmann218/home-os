@@ -99,3 +99,6 @@ button.primary { background: var(--accent); color: #062421; border-color: var(--
   .grid { grid-template-columns: 1fr; }
   .devices { grid-template-columns: repeat(2, 1fr); }
 }
+.input { background: var(--surface-2); color: var(--text-primary); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; font: inherit; }
+.input:focus { outline: none; border-color: var(--accent); }
+.dataset { display: inline-block; font-size: 10px; color: var(--warn); border: 1px solid var(--warn); border-radius: 6px; padding: 1px 6px; margin-top: 3px; }

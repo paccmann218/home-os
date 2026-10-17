@@ -9,6 +9,7 @@
  */
 import { bodyAlgo, bodyRead } from "../graph/graphs.js";
 import * as w from "../writeapi/index.js";
+import { present, KEYSTONE_LABELS, KEYSTONE_RELS } from "../graph/schemaInfo.js";
 import { bus } from "../bus.js";
 
 const CONDITION_KIND: Record<string, string> = { sick_day: "unwell", cool_down: "recovery", wind_down: "sleep" };
@@ -17,28 +18,31 @@ export async function runScientist(alias: string) {
   const t0 = Date.now();
   await bodyAlgo(alias, "sci_band_likelihood", { kind: "sleep" }, true);
   await bodyAlgo(alias, "sci_cooccurrence", { kind: "sleep" }, true);
+  const ks = await present(alias, KEYSTONE_LABELS, KEYSTONE_RELS);
   const [drivers, keystone, types] = await Promise.all([
-    bodyAlgo(alias, "drivers", { limit: 5 }),
-    bodyAlgo(alias, "keystone", { limit: 5 }),
-    bodyAlgo(alias, "episode_types", {}, true),
+    bodyAlgo(alias, "drivers", { limit: 5 }).catch(() => []),
+    ks.rels.length ? bodyAlgo(alias, "keystone", { limit: 5, labels: ks.labels, rels: ks.rels }).catch(() => []) : Promise.resolve([]),
+    bodyAlgo(alias, "episode_types", {}, true).catch(() => []),
   ]);
   const insights: string[] = [];
+  const pct = (x: number) => `${Math.round(x * 100)}%`;
   if (drivers[0]) {
     const d = drivers[0];
-    const text = `Top driver of bad nights: ${d.band} (PageRank ${Number(d.score).toFixed(2)}, P(bad night | ${d.band}) = ${Number(d.p_bad).toFixed(2)} over ${d.nights} nights)`;
+    const text = `Top driver of bad nights: ${d.band} — ${d.bad_nights} of ${d.nights} such nights were bad (${pct(d.p_bad)}), ${Number(d.lift).toFixed(1)}× ${alias}'s usual rate (PageRank ${Number(d.score).toFixed(2)})`;
     insights.push(text);
     await w.writeInsight(alias, "pageRank", text, d.band, drivers);
   }
-  if (keystone[0]) {
-    const k = keystone[0];
-    const text = `Keystone context: ${k.band} sits on the most cause chains (betweenness ${Number(k.score).toFixed(1)})`;
+  const k = keystone.find((x) => (x.lift ?? 0) > 1);
+  if (k) {
+    const text = `Keystone deviation: ${k.band} sits on the most cause chains (betweenness ${Number(k.score).toFixed(0)}, ${Number(k.lift ?? 1).toFixed(1)}× risk)`;
     insights.push(text);
     await w.writeInsight(alias, "betweenness", text, k.band, keystone);
   }
   if (types.length) {
-    const text = `Found ${types.length} episode types; largest: ${types[0].signature.join(" + ")} (${types[0].size} episodes)`;
+    const kinds = types.map((t: any) => `${t.signature.join(" + ") || "no clear deviation"} (${t.size})`).join("; ");
+    const text = `${alias}'s bad nights come in ${types.length} kind${types.length > 1 ? "s" : ""}: ${kinds}`;
     insights.push(text);
-    await w.writeInsight(alias, "labelPropagation", text, null, types);
+    await w.writeInsight(alias, "labelPropagation", text, types[0].signature[0] ?? null, types);
   }
 
   // Procedural memory: if the person's own evidence now disagrees with a playbook, version it.

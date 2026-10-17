@@ -10,6 +10,7 @@ import { now, run, agentUser } from "../graph/db.js";
 import { bodyGraph } from "../config.js";
 import { embed } from "../llm/azure.js";
 import * as w from "../writeapi/index.js";
+import { present, KEYSTONE_LABELS, KEYSTONE_RELS } from "../graph/schemaInfo.js";
 
 export interface Tool {
   name: string;
@@ -115,7 +116,10 @@ export const tools: Tool[] = [
     name: "keystone",
     description: "Keystone context: betweenness centrality of bands on the episode -> band -> lever graph.",
     schema: z.object({ limit: z.number().int().default(5) }),
-    run: (alias, a) => bodyAlgo(alias, "keystone", { limit: a.limit ?? 5 }),
+    run: async (alias, a) => {
+      const ks = await present(alias, KEYSTONE_LABELS, KEYSTONE_RELS);
+      return ks.rels.length ? bodyAlgo(alias, "keystone", { limit: a.limit ?? 5, labels: ks.labels, rels: ks.rels }) : [];
+    },
   },
   {
     name: "episode_types",

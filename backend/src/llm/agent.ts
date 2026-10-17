@@ -117,6 +117,8 @@ export async function runAgent(opts: {
   allow?: (toolName: string) => boolean;
   maxSteps?: number;
   json?: boolean;
+  /** Reasoning effort for the model (lower = faster tool loops for voice). */
+  effort?: "minimal" | "low" | "medium" | "high";
   onTool?: (t: ToolTrace) => void;
 }): Promise<{ text: string; trace: ToolTrace[] }> {
   const box = await toolbox(opts.alias);
@@ -129,7 +131,8 @@ export async function runAgent(opts: {
       messages,
       tools: tools.length ? tools : undefined,
       max_completion_tokens: 1200,
-    });
+      reasoning_effort: opts.effort ?? "low",
+    } as any);
     const msg = res.choices[0].message;
     messages.push(msg as any);
     if (!msg.tool_calls?.length) return { text: msg.content ?? "", trace };

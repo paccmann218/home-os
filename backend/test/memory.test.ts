@@ -116,7 +116,16 @@ describe("memory survives a FalkorDB restart", () => {
         await new Promise((r) => setTimeout(r, 500));
       }
     }
-    await new Promise((r) => setTimeout(r, 1500));
+    // Wait until FalkorDB answers a real graph query (not just PING) on a fresh connection.
+    for (let i = 0; i < 20; i++) {
+      try {
+        await Promise.race([run("body:alice", "RETURN 1"), new Promise((_, rej) => setTimeout(() => rej(new Error("slow")), 3000))]);
+        break;
+      } catch {
+        await closeAll();
+        await new Promise((r) => setTimeout(r, 500));
+      }
+    }
     const ep = await bodyRead("alice", "explain", { decision: "none" }).catch(() => []);
     expect(Array.isArray(ep)).toBe(true);
     const [e] = await run("body:alice", "MATCH (e:Episode {id:$id}) RETURN e.summary AS s", { id: marker });

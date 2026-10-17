@@ -148,14 +148,14 @@ class MainActivity : ComponentActivity() {
                         busy = true
                         scope.launch {
                             val r = runCatching { withContext(Dispatchers.IO) { HealthSync.sync(this@MainActivity, prefs.url, prefs.alias, 2) } }
-                            add(r.getOrElse { "Sync failed: ${it.message}" }); prefs.lastSync = "${java.time.LocalTime.now().withNano(0)} (manual)"; busy = false
+                            val line = r.getOrElse { "Sync failed: ${it.message}" }; add(line); prefs.lastSync = "${java.time.LocalTime.now().withNano(0)} (manual): $line"; busy = false
                         }
                     }) { Text("Sync now") }
                     OutlinedButton(enabled = !busy, onClick = {
                         busy = true
                         scope.launch {
                             val r = runCatching { withContext(Dispatchers.IO) { HealthSync.sync(this@MainActivity, prefs.url, prefs.alias, 120) } }
-                            add(r.getOrElse { "Backfill failed: ${it.message}" }); busy = false
+                            val line = r.getOrElse { "Backfill failed: ${it.message}" }; add(line); prefs.lastSync = "${java.time.LocalTime.now().withNano(0)} (backfill): $line"; busy = false
                         }
                     }) { Text("Backfill 120 d") }
                 }

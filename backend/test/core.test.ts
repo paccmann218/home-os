@@ -159,7 +159,8 @@ describe("memory over time and graph algorithms", () => {
     const why = (await toolByName.get("why_bad_night")!.run("alice", {})) as any;
     expect(why.chains.length).toBeGreaterThan(0);
     expect((await bodyAlgo("alice", "drivers", { limit: 5 })).length).toBeGreaterThan(0);
-    expect(Array.isArray(await bodyAlgo("alice", "keystone", { limit: 5 }))).toBe(true);
+    const ks = (await toolByName.get("keystone")!.run("alice", { limit: 5 })) as any[];
+    expect(ks.length).toBeGreaterThan(0);
     expect((await bodyAlgo("alice", "episode_types", {}, true)).length).toBeGreaterThan(0);
   });
 });

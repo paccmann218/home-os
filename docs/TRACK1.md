@@ -43,6 +43,15 @@ The query goes Room → Device → Var → Signal, and Room → Person → Const
 | `impact` | `algo.bfs(device, 2, 'CONTROLS')` + AFFECTS | What a device change reaches, and who would feel it |
 | `similar_episodes` | `db.idx.vector.queryNodes` + shared `Band` nodes | Past situations like this one, and what was done |
 
+On real data, PMData participant p01 (150 nights, 137 rated by the participant; see [`results/scientist_p01.json`](results/scientist_p01.json)):
+- the top driver is a short sleep window (30 of 63 such nights rated bad, 1.6× the base rate);
+- bad nights fall into three kinds: short window + late bedtime, elevated resting HR + evening workout, very active day + evening workout;
+- the last bad night's most likely cause chain is short sleep window → `sleep_window` habit (0.48).
+
+The whole analysis takes 64 ms.
+
+All of these run on **deviations from the person's own normal**: bands outside their usual level get the `:Notable` label, and labels are exactly what FalkorDB algorithms filter on.
+
 The cause-chain weights are learned. The Scientist sets each band's `neglogp = −ln P(bad night | band)` with Laplace smoothing ([`sci_band_likelihood.cypher`](../graph/queries/sci_band_likelihood.cypher)), so the lightest path is the most probable cause, and `HomeOS.likelihood(pathWeight)` turns it back into a probability.
 
 ## 3. Tool selection through MCP
