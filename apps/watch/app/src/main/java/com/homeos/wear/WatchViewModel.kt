@@ -1,6 +1,10 @@
 package com.homeos.wear
 
 import android.app.Application
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.speech.tts.TextToSpeech
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
@@ -62,7 +66,29 @@ class WatchViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Wear OS routes traffic over the phone's Bluetooth proxy (or turns Wi-Fi off) unless an app asks for
+     * Wi-Fi. HomeOS talks to a laptop on the LAN, so hold a Wi-Fi request and bind the process to it.
+     */
+    private val connectivity = app.getSystemService(ConnectivityManager::class.java)
+    private val wifiCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            connectivity.bindProcessToNetwork(network)
+            client.connect()
+        }
+
+        override fun onLost(network: Network) {
+            connectivity.bindProcessToNetwork(null)
+        }
+    }
+
     fun start() {
+        runCatching {
+            connectivity.requestNetwork(
+                NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build(),
+                wifiCallback,
+            )
+        }.onFailure { Log.w("HomeOS", "wifi request failed: ${it.message}") }
         client.connect()
         hr.start()
         val samsung = ibi.start()
@@ -133,6 +159,7 @@ class WatchViewModel(app: Application) : AndroidViewModel(app) {
     private fun buzz() = runCatching { Pacer(getApplication()).start(30.0, 1) }
 
     override fun onCleared() {
+        runCatching { connectivity.unregisterNetworkCallback(wifiCallback) }
         stop()
         client.disconnect()
         tts?.shutdown()
