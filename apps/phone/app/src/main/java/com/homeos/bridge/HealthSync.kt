@@ -6,6 +6,8 @@ import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.HeartRateVariabilityRmssdRecord
+import androidx.health.connect.client.records.MenstruationFlowRecord
+import androidx.health.connect.client.records.MenstruationPeriodRecord
 import androidx.health.connect.client.records.Record
 import androidx.health.connect.client.records.RestingHeartRateRecord
 import androidx.health.connect.client.records.SleepSessionRecord
@@ -39,6 +41,8 @@ object HealthSync {
         HealthPermission.getReadPermission(SleepSessionRecord::class),
         HealthPermission.getReadPermission(ExerciseSessionRecord::class),
         HealthPermission.getReadPermission(Vo2MaxRecord::class),
+        HealthPermission.getReadPermission(MenstruationPeriodRecord::class),
+        HealthPermission.getReadPermission(MenstruationFlowRecord::class),
         HealthPermission.PERMISSION_READ_HEALTH_DATA_HISTORY,
         HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND,
     )
@@ -67,6 +71,12 @@ object HealthSync {
             emptyList()
         }
 
+    private val FLOW = mapOf(
+        MenstruationFlowRecord.FLOW_LIGHT to "light",
+        MenstruationFlowRecord.FLOW_MEDIUM to "medium",
+        MenstruationFlowRecord.FLOW_HEAVY to "heavy",
+    )
+
     private val STAGES = mapOf(
         SleepSessionRecord.STAGE_TYPE_DEEP to "deep",
         SleepSessionRecord.STAGE_TYPE_REM to "rem",
@@ -91,6 +101,8 @@ object HealthSync {
         val steps = safe("steps", errors) { readAll(client, StepsRecord::class, from, to) }
         val ex = safe("exercise", errors) { readAll(client, ExerciseSessionRecord::class, from, to) }
         val vo2 = safe("vo2max", errors) { readAll(client, Vo2MaxRecord::class, from, to) }
+        val periods = safe("menstruation", errors) { readAll(client, MenstruationPeriodRecord::class, from, to) }
+        val flow = safe("menstruation_flow", errors) { readAll(client, MenstruationFlowRecord::class, from, to) }
         val origins = (sleep.map { it.metadata.dataOrigin.packageName } + hr.map { it.metadata.dataOrigin.packageName } +
             rhr.map { it.metadata.dataOrigin.packageName } + hrv.map { it.metadata.dataOrigin.packageName } +
             steps.map { it.metadata.dataOrigin.packageName }).distinct()
@@ -114,11 +126,17 @@ object HealthSync {
             .put("steps", JSONArray(steps.map { JSONObject().put("start", it.startTime.toEpochMilli()).put("end", it.endTime.toEpochMilli()).put("count", it.count) }))
             .put("exercise", JSONArray(ex.map { JSONObject().put("start", it.startTime.toEpochMilli()).put("end", it.endTime.toEpochMilli()).put("type", it.exerciseType) }))
             .put("vo2max", JSONArray(vo2.map { JSONObject().put("t", it.time.toEpochMilli()).put("value", it.vo2MillilitersPerMinuteKilogram) }))
+            .put("menstruation", JSONArray(periods.map {
+                JSONObject().put("start", it.startTime.toEpochMilli()).put("end", it.endTime.toEpochMilli()).put("origin", it.metadata.dataOrigin.packageName)
+            }))
+            .put("menstruation_flow", JSONArray(flow.map {
+                JSONObject().put("t", it.time.toEpochMilli()).put("flow", FLOW[it.flow] ?: "unspecified").put("origin", it.metadata.dataOrigin.packageName)
+            }))
 
         val req = Request.Builder().url("$baseUrl/api/health/$alias").post(body.toString().toRequestBody("application/json".toMediaType())).build()
         val resp = http.newCall(req).execute().use { it.body?.string() ?: "" }
         return "Read ${sleep.size} nights, ${hr.sumOf { it.samples.size }} HR samples, ${rhr.size} resting HR, ${hrv.size} HRV, " +
-            "${steps.size} step records over $days d" +
+            "${steps.size} step records, ${periods.size} period records, ${flow.size} flow logs over $days d" +
             (if (origins.isNotEmpty()) " (from ${origins.joinToString()})" else "") +
             " · $granted permissions" +
             (if (errors.isNotEmpty()) "\nErrors: " + errors.entries.joinToString { "${it.key}: ${it.value}" } else "") +
