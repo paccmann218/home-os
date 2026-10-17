@@ -1,0 +1,559 @@
+{
+  "_comment": "Seed knowledge for HomeOS. Home graph: rooms, devices, what each device controls and what that does to the body (literature priors). Body graphs: default conditions, comfort preferences, intervention catalogue and weak evidence priors. Everything here is editable at runtime (by voice or by learning) - it is data, not code. Condition priority decides whose comfort range wins when ranges conflict (a sick person's floor beats a post-workout ceiling); only the number is shared, never the reason.",
+  "rooms": [
+    {
+      "id": "bedroom",
+      "name": "Bedroom"
+    }
+  ],
+  "devices": [
+    {
+      "id": "ac",
+      "room": "bedroom",
+      "kind": "ac",
+      "driver": "virtual",
+      "name": "Air conditioner",
+      "min": 18,
+      "max": 30,
+      "state": {
+        "power": "off",
+        "setpoint": 26
+      }
+    },
+    {
+      "id": "fan",
+      "room": "bedroom",
+      "kind": "fan",
+      "driver": "virtual",
+      "name": "Fan",
+      "min": 0,
+      "max": 3,
+      "state": {
+        "power": "off",
+        "level": 0
+      }
+    },
+    {
+      "id": "light",
+      "room": "bedroom",
+      "kind": "light",
+      "driver": "esp32",
+      "name": "Room light (ESP32 LED)",
+      "min": 0,
+      "max": 100,
+      "state": {
+        "power": "off",
+        "brightness": 0
+      }
+    },
+    {
+      "id": "bulb",
+      "room": "bedroom",
+      "kind": "light",
+      "driver": "wiz",
+      "name": "WiZ bulb",
+      "min": 0,
+      "max": 100,
+      "state": {
+        "power": "off",
+        "brightness": 0
+      }
+    },
+    {
+      "id": "env",
+      "room": "bedroom",
+      "kind": "sensor",
+      "driver": "esp32",
+      "name": "Room sensor (ESP32 DHT11 + light)",
+      "state": {}
+    }
+  ],
+  "vars": [
+    "room_temp",
+    "airflow",
+    "humidity",
+    "lux",
+    "cct",
+    "noise"
+  ],
+  "signals": [
+    "hr",
+    "rmssd",
+    "skin_temp",
+    "deep_sleep",
+    "sleep_quality",
+    "thermal_comfort"
+  ],
+  "controls": [
+    {
+      "device": "ac",
+      "var": "room_temp",
+      "strength": 1.0
+    },
+    {
+      "device": "ac",
+      "var": "humidity",
+      "strength": 0.5
+    },
+    {
+      "device": "ac",
+      "var": "airflow",
+      "strength": 0.3
+    },
+    {
+      "device": "ac",
+      "var": "noise",
+      "strength": 0.3
+    },
+    {
+      "device": "fan",
+      "var": "airflow",
+      "strength": 1.0
+    },
+    {
+      "device": "fan",
+      "var": "noise",
+      "strength": 0.4
+    },
+    {
+      "device": "light",
+      "var": "lux",
+      "strength": 1.0
+    },
+    {
+      "device": "bulb",
+      "var": "lux",
+      "strength": 1.0
+    },
+    {
+      "device": "bulb",
+      "var": "cct",
+      "strength": 1.0
+    }
+  ],
+  "affects": [
+    {
+      "var": "room_temp",
+      "signal": "skin_temp",
+      "sign": 1,
+      "prior": 0.4,
+      "source_url": "https://doi.org/10.1186/1880-6805-31-14"
+    },
+    {
+      "var": "room_temp",
+      "signal": "deep_sleep",
+      "sign": -1,
+      "prior": 0.3,
+      "source_url": "https://doi.org/10.1186/1880-6805-31-14"
+    },
+    {
+      "var": "room_temp",
+      "signal": "thermal_comfort",
+      "sign": 0,
+      "prior": 0.5,
+      "source_url": "https://www.ashrae.org/technical-resources/standards-and-guidelines"
+    },
+    {
+      "var": "airflow",
+      "signal": "hr",
+      "sign": -1,
+      "prior": 0.2,
+      "source_url": "https://doi.org/10.1080/02640414.2014.996581"
+    },
+    {
+      "var": "airflow",
+      "signal": "thermal_comfort",
+      "sign": 1,
+      "prior": 0.3,
+      "source_url": "https://doi.org/10.1111/ina.12099"
+    },
+    {
+      "var": "humidity",
+      "signal": "thermal_comfort",
+      "sign": -1,
+      "prior": 0.2,
+      "source_url": "https://doi.org/10.1111/ina.12099"
+    },
+    {
+      "var": "lux",
+      "signal": "sleep_quality",
+      "sign": -1,
+      "prior": 0.3,
+      "source_url": "https://doi.org/10.1073/pnas.1418490112"
+    },
+    {
+      "var": "noise",
+      "signal": "deep_sleep",
+      "sign": -1,
+      "prior": 0.3,
+      "source_url": "https://doi.org/10.1016/j.smrv.2019.101233"
+    }
+  ],
+  "interventions": [
+    {
+      "name": "ac_cooler",
+      "device": "ac",
+      "var": "room_temp",
+      "label": "AC 2 °C cooler",
+      "params": {
+        "delta": -2
+      }
+    },
+    {
+      "name": "ac_warmer",
+      "device": "ac",
+      "var": "room_temp",
+      "label": "AC 2 °C warmer",
+      "params": {
+        "delta": 2
+      }
+    },
+    {
+      "name": "fan_high",
+      "device": "fan",
+      "var": "airflow",
+      "label": "Fan on high",
+      "params": {
+        "level": 3
+      }
+    },
+    {
+      "name": "fan_low",
+      "device": "fan",
+      "var": "airflow",
+      "label": "Fan on low",
+      "params": {
+        "level": 1
+      }
+    },
+    {
+      "name": "fan_off",
+      "device": "fan",
+      "var": "airflow",
+      "label": "Fan off",
+      "params": {
+        "level": 0
+      }
+    },
+    {
+      "name": "light_warm_dim",
+      "device": "light",
+      "var": "lux",
+      "label": "Warm, dim light",
+      "params": {
+        "brightness": 20
+      }
+    },
+    {
+      "name": "light_bright",
+      "device": "light",
+      "var": "lux",
+      "label": "Bright light",
+      "params": {
+        "brightness": 90
+      }
+    },
+    {
+      "name": "pacer_5_0",
+      "device": "watch",
+      "var": null,
+      "label": "Breathing pacer 5.0/min",
+      "params": {
+        "bpm": 5.0
+      }
+    },
+    {
+      "name": "pacer_5_5",
+      "device": "watch",
+      "var": null,
+      "label": "Breathing pacer 5.5/min",
+      "params": {
+        "bpm": 5.5
+      }
+    },
+    {
+      "name": "pacer_6_0",
+      "device": "watch",
+      "var": null,
+      "label": "Breathing pacer 6.0/min",
+      "params": {
+        "bpm": 6.0
+      }
+    },
+    {
+      "name": "none",
+      "device": null,
+      "var": null,
+      "label": "Do nothing (control)",
+      "params": {}
+    }
+  ],
+  "conditions": [
+    {
+      "kind": "sick",
+      "label": "Feeling sick",
+      "shifts": [
+        {
+          "var": "room_temp",
+          "min": 26,
+          "max": 29
+        },
+        {
+          "var": "airflow",
+          "max": 1
+        }
+      ],
+      "priority": 3
+    },
+    {
+      "kind": "fever",
+      "label": "Fever",
+      "implies": [
+        "sick"
+      ],
+      "shifts": [],
+      "priority": 3
+    },
+    {
+      "kind": "cold_symptoms",
+      "label": "Cold / sore throat",
+      "implies": [
+        "sick"
+      ],
+      "shifts": [
+        {
+          "var": "humidity",
+          "min": 40
+        }
+      ],
+      "priority": 3
+    },
+    {
+      "kind": "headache",
+      "label": "Headache",
+      "shifts": [
+        {
+          "var": "lux",
+          "max": 30
+        },
+        {
+          "var": "noise",
+          "max": 1
+        }
+      ],
+      "priority": 2
+    },
+    {
+      "kind": "post_workout",
+      "label": "Just worked out",
+      "shifts": [
+        {
+          "var": "room_temp",
+          "max": 25
+        },
+        {
+          "var": "airflow",
+          "min": 2
+        }
+      ],
+      "priority": 1
+    },
+    {
+      "kind": "sleeping",
+      "label": "Sleeping",
+      "shifts": [
+        {
+          "var": "lux",
+          "max": 5
+        },
+        {
+          "var": "noise",
+          "max": 1
+        },
+        {
+          "var": "airflow",
+          "max": 2
+        }
+      ],
+      "priority": 2
+    },
+    {
+      "kind": "stressed",
+      "label": "Stressed",
+      "shifts": [
+        {
+          "var": "lux",
+          "max": 60
+        }
+      ],
+      "priority": 1
+    },
+    {
+      "kind": "menstrual",
+      "label": "On period",
+      "shifts": [
+        {
+          "var": "room_temp",
+          "min": 25
+        }
+      ],
+      "priority": 2
+    }
+  ],
+  "preferences": [
+    {
+      "var": "room_temp",
+      "min": 23,
+      "max": 27
+    },
+    {
+      "var": "airflow",
+      "min": 0,
+      "max": 3
+    },
+    {
+      "var": "lux",
+      "min": 0,
+      "max": 100
+    }
+  ],
+  "evidence_priors": [
+    {
+      "kind": "recovery",
+      "intervention": "fan_high",
+      "mean": 0.3
+    },
+    {
+      "kind": "recovery",
+      "intervention": "ac_cooler",
+      "mean": 0.3
+    },
+    {
+      "kind": "recovery",
+      "intervention": "pacer_5_5",
+      "mean": 0.2
+    },
+    {
+      "kind": "recovery",
+      "intervention": "fan_low",
+      "mean": 0.15
+    },
+    {
+      "kind": "recovery",
+      "intervention": "none",
+      "mean": 0.0
+    },
+    {
+      "kind": "stress",
+      "intervention": "pacer_5_0",
+      "mean": 0.25
+    },
+    {
+      "kind": "stress",
+      "intervention": "pacer_5_5",
+      "mean": 0.3
+    },
+    {
+      "kind": "stress",
+      "intervention": "pacer_6_0",
+      "mean": 0.3
+    },
+    {
+      "kind": "stress",
+      "intervention": "light_warm_dim",
+      "mean": 0.1
+    },
+    {
+      "kind": "stress",
+      "intervention": "none",
+      "mean": 0.0
+    },
+    {
+      "kind": "too_hot",
+      "intervention": "ac_cooler",
+      "mean": 0.4
+    },
+    {
+      "kind": "too_hot",
+      "intervention": "fan_high",
+      "mean": 0.35
+    },
+    {
+      "kind": "too_hot",
+      "intervention": "fan_low",
+      "mean": 0.2
+    },
+    {
+      "kind": "too_cold",
+      "intervention": "ac_warmer",
+      "mean": 0.4
+    },
+    {
+      "kind": "too_cold",
+      "intervention": "fan_off",
+      "mean": 0.3
+    },
+    {
+      "kind": "unwell",
+      "intervention": "ac_warmer",
+      "mean": 0.25
+    },
+    {
+      "kind": "unwell",
+      "intervention": "fan_off",
+      "mean": 0.2
+    },
+    {
+      "kind": "unwell",
+      "intervention": "light_warm_dim",
+      "mean": 0.15
+    },
+    {
+      "kind": "unwell",
+      "intervention": "none",
+      "mean": 0.0
+    },
+    {
+      "kind": "sleep",
+      "intervention": "light_warm_dim",
+      "mean": 0.2
+    },
+    {
+      "kind": "sleep",
+      "intervention": "fan_low",
+      "mean": 0.1
+    },
+    {
+      "kind": "sleep",
+      "intervention": "none",
+      "mean": 0.0
+    }
+  ],
+  "playbooks": [
+    {
+      "name": "sick_day",
+      "condition": "sick",
+      "steps": [
+        "ac_warmer",
+        "fan_off",
+        "light_warm_dim"
+      ]
+    },
+    {
+      "name": "cool_down",
+      "condition": "post_workout",
+      "steps": [
+        "fan_high",
+        "pacer_5_5"
+      ]
+    },
+    {
+      "name": "wind_down",
+      "condition": "sleeping",
+      "steps": [
+        "light_warm_dim",
+        "fan_low"
+      ]
+    }
+  ]
+}

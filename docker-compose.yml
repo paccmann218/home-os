@@ -1,0 +1,49 @@
+# HomeOS: one command brings up FalkorDB (+ Browser) and the HomeOS backend (agents + dashboard).
+#   docker compose up -d --build        -> dashboard http://localhost:3001, FalkorDB Browser http://localhost:3000
+# For development you can run only FalkorDB (`docker compose up -d falkordb`) and the backend from source.
+services:
+  falkordb:
+    image: falkordb/falkordb:latest
+    container_name: homeos-falkordb
+    ports:
+      - "6379:6379"   # FalkorDB (Redis protocol)
+      - "3000:3000"   # FalkorDB Browser
+    environment:
+      # RDB snapshot every second with changes (+ on shutdown) so memory survives restarts; ACL file so
+      # per-agent users survive too. (AOF replay crashed FalkorDB 4.22.1 on effect replay, so RDB is used.)
+      REDIS_ARGS: "--appendonly no --save 1 1 --aclfile /acl/users.acl"
+    # Create the ACL file on first start (Redis refuses to boot without it), then run FalkorDB.
+    entrypoint:
+      - sh
+      - -c
+      - "mkdir -p /acl && ([ -f /acl/users.acl ] || echo 'user default on nopass ~* &* +@all' > /acl/users.acl) && exec /var/lib/falkordb/bin/run.sh redis-server --loadmodule /var/lib/falkordb/bin/falkordb.so"
+    volumes:
+      - falkordb-data:/var/lib/falkordb/data
+      - falkordb-acl:/acl
+    healthcheck:
+      test: ["CMD", "redis-cli", "PING"]
+      interval: 3s
+      retries: 20
+    restart: unless-stopped
+
+  homeos:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: homeos-backend
+    depends_on:
+      falkordb:
+        condition: service_healthy
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      FALKORDB_HOST: falkordb
+      FALKORDB_PORT: "6379"
+    ports:
+      - "3001:3001"   # dashboard + API + watch/phone WebSocket
+    restart: unless-stopped
+
+volumes:
+  falkordb-data:
+  falkordb-acl:
