@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -147,11 +148,32 @@ private fun ApplianceTile(device: Device, onClick: () -> Unit, modifier: Modifie
             // Ink on the fill, never more of the fill. When the tile itself became a solid
             // accent block, an accent-tinted icon on an accent-tinted disc was the same colour
             // three times over and the glyph simply dissolved.
+            //
+            // The disc is a small piece of glass in its own right now, so it is lit rather than
+            // outlined: an ink ring around every tile was a row of hard black circles on a sheet
+            // of surfaces that had all stopped having edges.
+            val discOnGlass = LocalOnGlass.current && HomeOs.glass
             Box(
                 Modifier
                     .size(36.dp)
-                    .background(colors.paper, CircleShape)
-                    .border(HomeOsDims.border, colors.border, CircleShape),
+                    .background(
+                        if (discOnGlass) colors.paper.copy(alpha = 0.72f) else colors.paper,
+                        CircleShape,
+                    )
+                    .then(
+                        if (discOnGlass) {
+                            Modifier.border(
+                                HomeOsDims.glassEdge,
+                                Brush.verticalGradient(
+                                    0.00f to colors.specular.copy(alpha = 0.90f),
+                                    1.00f to colors.ink.copy(alpha = 0.26f),
+                                ),
+                                CircleShape,
+                            )
+                        } else {
+                            Modifier.border(HomeOsDims.border, colors.border, CircleShape)
+                        },
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(

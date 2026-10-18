@@ -183,6 +183,36 @@ class ContrastTest {
         }
     }
 
+    @Test
+    fun `the watercolour wash cannot take a caption under AA`() {
+        // The semantic rail became a wash of colour bleeding in from the border, which means the
+        // hue now sits *under text* where before it sat beside it. That is only safe because the
+        // wash uses the bright member of each pair rather than the ink one: the bright tones are
+        // light, so laying one over a pane barely moves its luminance.
+        //
+        // 0.24 is the ceiling the gradient is built to — the strength the wash has fallen to by
+        // the time it reaches the block padding, where the first text begins. The peak at the
+        // very edge is twice that and no text is ever on it. If a future tuning raises the stops,
+        // this is the test that should stop it.
+        val ceiling = 0.24
+        val backdrops = listOf(
+            // in a modal: a pane on a sheet on the darkest page this app can show
+            "a pane in a modal over the graph" to over(c.paper, 0.36, over(c.shellRaised, 0.60, Color.Black)),
+            // on the field: a pane at its palest, which is its foot
+            "a pane on the field" to over(c.paper, 0.36, c.shell),
+        )
+        listOf(
+            "teal" to c.teal, "violet" to c.violet, "amber" to c.amber,
+            "green" to c.green, "red" to c.red,
+        ).forEach { (name, accent) ->
+            backdrops.forEach { (where, pane) ->
+                val washed = over(accent, ceiling, pane)
+                assertContrast("a caption on a $name wash, $where", c.inkMuted, washed, 4.5)
+                assertContrast("body on a $name wash, $where", c.ink, washed, 4.5)
+            }
+        }
+    }
+
     // ------------------------------------------------------------------------------ everything
 
     @Test

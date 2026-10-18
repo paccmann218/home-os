@@ -57,6 +57,7 @@ import com.homeos.bridge.theme.HomeOsShapes
 import com.homeos.bridge.theme.Motion
 import com.homeos.bridge.theme.Plate
 import com.homeos.bridge.theme.color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import com.homeos.bridge.theme.ink
 
 /**
@@ -112,7 +113,9 @@ fun PaperBlock(
     // made it chromatic because a black shadow measured 1.38:1 on a near-black shell and could not
     // be seen. On a bright field a black shadow measures 10.59:1, and the canonical style puts one
     // under *everything* - that uniformity is the texture, rather than a thing to be rationed.
-    val onGlass = LocalOnGlass.current
+    // The one case translucency cannot serve: when someone has asked the system for more
+    // contrast, the honest answer is to stop being see-through rather than to tune an alpha.
+    val onGlass = LocalOnGlass.current && HomeOs.glass
     val offset = when {
         onGlass -> 0.dp
         lead -> HomeOsDims.plateOffsetLead
@@ -205,7 +208,13 @@ fun PaperBlock(
                 )
                 .then(
                     if (onGlass) {
-                        Modifier.pane(shape, colors, lead, press)
+                        Modifier.pane(
+                            shape = shape,
+                            colors = colors,
+                            lead = lead,
+                            press = press,
+                            accent = if (railed) plate.color(colors) else null,
+                        )
                     } else {
                         // Flat. A gradient on a paper block is the one thing that style will not
                         // have: the fill is a single value and the only modelling is the offset.
@@ -213,7 +222,7 @@ fun PaperBlock(
                     },
                 )
                 .then(
-                    if (railed) {
+                    if (railed && !onGlass) {
                         Modifier.drawBehind {
                             drawRect(railBrush, size = Size(railWidth.toPx(), size.height))
                         }
@@ -225,7 +234,7 @@ fun PaperBlock(
                     if (onGlass) Modifier else Modifier.border(HomeOsDims.border, colors.border, shape),
                 )
                 .padding(padding)
-                .then(if (railed) Modifier.padding(start = railWidth) else Modifier),
+                .then(if (railed && !onGlass) Modifier.padding(start = railWidth) else Modifier),
             verticalArrangement = verticalArrangement,
             content = content,
         )
@@ -256,6 +265,7 @@ private fun Modifier.pane(
     colors: com.homeos.bridge.theme.HomeOsColors,
     lead: Boolean,
     press: Float,
+    accent: Color?,
 ) = drawWithCache {
     val outline = shape.createOutline(size, layoutDirection, this)
     val edge = Stroke(HomeOsDims.glassEdge.toPx() * 2f)
@@ -286,11 +296,81 @@ private fun Modifier.pane(
         1.00f to colors.ink.copy(alpha = 0.28f),
     )
 
+    // ------------------------------------------------------------------- the pigment, if any
+    //
+    // What this replaces is a 4dp bar of flat colour down the left edge. It was doing an honest
+    // job — the hue is semantic and the block has to carry it — and it looked like a tab stuck on
+    // the side of a card, which on glass is worse than on paper because everything else has
+    // stopped having edges.
+    //
+    // So the hue enters through the border and runs into the pane, the way a wet edge runs into
+    // wet paper. Four passes, and the third is the one that makes it read as paint rather than as
+    // a gradient:
+    //
+    //  1. the bleed, falling away over about 46dp from the edge
+    //  2. two blooms whose centres sit *outside* the pane, so the wash never ends on a straight
+    //     line — which is the giveaway of a gradient and the thing a real wash never does
+    //  3. a ring where the pigment dried darker, because a watercolour wash is always strongest
+    //     at its boundary and palest in the middle; without it this is just a fade
+    //  4. the border itself, carrying the hue at full strength and losing it across the face
+    //
+    // It is kept to the outer band on purpose, and not only for looks. Text starts one block
+    // padding in (16dp), where the wash has fallen to about 0.15 of a *light* tone — the bright
+    // member of the pair, not the ink one, precisely so that laying it under text costs almost
+    // nothing. `ContrastTest` pins the ceiling.
+    val reach = (46.dp.toPx()).coerceAtMost(size.width * 0.62f)
+    val wash = if (accent == null) null else {
+        val k = if (lead) 1.12f else 1f
+        listOf(
+            Brush.horizontalGradient(
+                0.00f to accent.copy(alpha = 0.46f * k),
+                0.22f to accent.copy(alpha = 0.22f * k),
+                0.46f to accent.copy(alpha = 0.085f * k),
+                0.74f to accent.copy(alpha = 0.025f * k),
+                1.00f to Color.Transparent,
+                startX = 0f,
+                endX = reach,
+            ),
+            Brush.radialGradient(
+                0.00f to accent.copy(alpha = 0.14f * k),
+                0.55f to accent.copy(alpha = 0.05f * k),
+                1.00f to Color.Transparent,
+                center = Offset(-reach * 0.25f, size.height * 0.24f),
+                radius = reach * 1.9f,
+            ),
+            Brush.radialGradient(
+                0.00f to accent.copy(alpha = 0.13f * k),
+                0.60f to accent.copy(alpha = 0.035f * k),
+                1.00f to Color.Transparent,
+                center = Offset(reach * 0.10f, size.height * 1.02f),
+                radius = reach * 1.55f,
+            ),
+            Brush.radialGradient(
+                0.58f to Color.Transparent,
+                0.76f to accent.copy(alpha = 0.085f * k),
+                0.90f to Color.Transparent,
+                center = Offset(-reach * 0.18f, size.height * 0.46f),
+                radius = reach * 2.1f,
+            ),
+        )
+    }
+    val accentRim = accent?.let {
+        Brush.horizontalGradient(
+            0.00f to it.copy(alpha = 0.85f),
+            0.16f to it.copy(alpha = 0.34f),
+            0.46f to Color.Transparent,
+            startX = 0f,
+            endX = size.width,
+        )
+    }
+
     onDrawBehind {
         drawOutline(outline, fill)
+        wash?.forEach { drawRect(it) }
         drawRect(shine)
         drawRect(shade)
         drawOutline(outline, rim, style = edge)
+        accentRim?.let { drawOutline(outline, it, style = edge) }
     }
 }
 
@@ -386,15 +466,25 @@ private fun Modifier.plateOffset(amount: Dp) = layout { measurable, constraints 
     }
 }
 
-/**
- * Screen margins for a paper block.
- *
- * The end margin is short by exactly the plate offset, because every block reserves that much on
- * its right for a plate it may or may not draw. Without this, paper edges would sit 4dp inside the
- * margin that section headings and edge-to-edge strips use, and the screen would look very subtly
- * out of true for a reason nobody could name.
- */
+/** Screen margins for a block. See [blockEndMargin] for why the two sides differ on paper. */
+@Composable
 fun Modifier.blockMargin(): Modifier = padding(
     start = HomeOsDims.screenMargin,
-    end = HomeOsDims.screenMargin - HomeOsDims.plateOffset,
+    end = blockEndMargin(),
 )
+
+/**
+ * The end margin a list of blocks wants.
+ *
+ * A paper block reserves the plate offset on its right for a shadow it may or may not draw, so the
+ * margin is short by exactly that much or every block would sit inset from the heading above it.
+ * A pane reserves nothing, so it wants the full margin — and getting this wrong is the kind of
+ * mistake that makes a screen look very subtly out of true for a reason nobody can name.
+ */
+@Composable
+fun blockEndMargin(): Dp =
+    if (LocalOnGlass.current && HomeOs.glass) {
+        HomeOsDims.screenMargin
+    } else {
+        HomeOsDims.screenMargin - HomeOsDims.plateOffset
+    }
