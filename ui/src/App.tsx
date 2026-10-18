@@ -75,7 +75,7 @@ export default function App() {
       .catch(() => undefined);
   }, [refreshState, showDecision]);
 
-  // Deep links for demos/screenshots: ?scientist=p01 opens that person's Scientist report, ?tab=home|<alias>.
+  // Deep links: ?scientist=p01 opens that person's Scientist report, ?tab=home|<alias>.
   useEffect(() => {
     const q = new URLSearchParams(location.search);
     const sci = q.get("scientist");

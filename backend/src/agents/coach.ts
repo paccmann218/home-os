@@ -13,6 +13,7 @@ import { llmAvailable } from "../llm/azure.js";
 import { bus } from "../bus.js";
 import { say } from "../channels.js";
 import { CHIPS, handleChip } from "./guardian.js";
+import { proposeMorning, trySpokenMorning } from "./morning.js";
 
 const sessions = new Map<string, { id: string; last: number }>();
 
@@ -33,6 +34,9 @@ You answer from the graph: ALWAYS call tools before answering about their body, 
 - "what works / what helps" -> what_works and/or playbooks_for; "last time / remember" -> recall.
 - "what changed / what do you know about me" -> belief_diff or get_context.
 - "why did I sleep badly" -> why_bad_night (and drivers if useful).
+- Calendar questions ("what's on tomorrow", "do I have a meeting") -> upcoming_events and calendar_memory. If they return nothing, say the calendar is empty in the graph.
+- Sleep questions about recent nights -> recent_sleep and sleep_week. If they return nothing, say the ring has not synced.
+- "Why is the alarm set" or "what time is the clock" -> explain for the morning decision, plus clock_state. Do not invent alarm times that are not in those results.
 - If they report a symptom or state (fever, sick, headache, stressed, too hot/cold, done working out), call set_condition with the right kind.
 - If they state a lasting preference or dislike, call set_preference / set_dislike.
 - For any other question about the shared home (devices, rooms, who is present, past arbitrations, tasks), use the official FalkorDB tools: call falkordb__get_graph_schema on graph "home:flat1" first, then falkordb__query_graph_readonly with Cypher that matches that schema.
@@ -56,6 +60,12 @@ export async function ask(alias: string, text: string, opts: { lang?: string; ch
     const reply = "I don't have any memory of you or your home, so I can't say.";
     if (opts.speak !== false) await say(alias, reply);
     return { reply, tools: [] };
+  }
+  const spokenMorning = await trySpokenMorning(alias, text);
+  if (spokenMorning) return { reply: "", tools: [] };
+  if (/\b(morning alarm|check my morning|set my alarm|set the alarm)\b/i.test(text)) {
+    await proposeMorning(alias);
+    return { reply: "", tools: [] };
   }
   // Short chip-like utterances go straight to the guardian (fast path, no LLM).
   const chip = Object.keys(CHIPS).find((k) => text.trim().toLowerCase().replace(/[^a-z_ ]/g, "") === k.replace("_", " "));

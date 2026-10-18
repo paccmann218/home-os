@@ -16,7 +16,8 @@ import { bus, type FeedEvent } from "./bus.js";
 import { register, connected } from "./channels.js";
 import { pushHr, setOnBody, snapshot } from "./ingest/buffer.js";
 import { ingestHealth } from "./ingest/health.js";
-import { cachedAudio, speak, transcribe, voiceEnabled } from "./voice/sarvam.js";
+import { cachedAudio, transcribe, voiceEnabled } from "./voice/sarvam.js";
+import { proposeMorning, recordCalendarEvent, trySpokenMorning } from "./agents/morning.js";
 import { startRoomPolling, memoryState } from "./devices/index.js";
 import { handleChip, answerPrompt, startGuardian } from "./agents/guardian.js";
 import { startPlanner } from "./agents/planner.js";
@@ -92,6 +93,8 @@ app.get(
 );
 
 app.post("/api/chip/:alias", wrap(async (req) => (rec(req, "chip", req.body), handleChip(person(req), String(req.body.chip), String(req.body.source ?? "app")))));
+app.post("/api/calendar/:alias", wrap(async (req) => recordCalendarEvent(person(req), { id: req.body.id, title: String(req.body.title ?? "Event"), at: Number(req.body.at), source: req.body.source })));
+app.post("/api/morning/:alias", wrap(async (req) => proposeMorning(person(req))));
 app.post("/api/ask/:alias", wrap(async (req) => (rec(req, "ask", req.body), ask(person(req), String(req.body.text), { lang: req.body.lang, channel: req.body.channel ?? "app", speak: req.body.speak !== false }))));
 app.post("/api/prompt/:alias", wrap(async (req) => (rec(req, "prompt", req.body), answerPrompt(person(req), String(req.body.id), String(req.body.answer)))));
 app.post("/api/presence/:alias", wrap(async (req) => w.setPresence(person(req), Boolean(req.body.present))));
@@ -235,41 +238,22 @@ deviceWss.on("connection", (ws: WebSocket, req: http.IncomingMessage) => {
       return;
     }
     try {
-      const clip = m.type === "audio" || m.type === "demo_hear";
+      const clip = m.type === "audio";
       record(clip ? "audio_ws" : m.type, alias, clip ? { bytes: String(m.wav_base64 ?? "").length } : m);
       if (m.type === "hr") pushHr(alias, { t: m.t ?? now(), hr: Number(m.hr), ibi: m.ibi });
       else if (m.type === "onbody") {
         setOnBody(alias, Boolean(m.on));
         await w.setPresence(alias, Boolean(m.on));
       } else if (m.type === "chip") await handleChip(alias, String(m.chip), kind);
-      else if (m.type === "ask") await ask(alias, String(m.text), { lang: m.lang, channel: kind });
+      else if (m.type === "ask") {
+        if (!(await trySpokenMorning(alias, String(m.text)))) await ask(alias, String(m.text), { lang: m.lang, channel: kind });
+      }
       else if (m.type === "prompt") await answerPrompt(alias, String(m.id), String(m.answer));
       else if (m.type === "audio") {
         const stt = await transcribe(Buffer.from(String(m.wav_base64), "base64"));
         ws.send(JSON.stringify({ type: "heard", text: stt.text }));
         if (stt.text) record("ask", alias, { text: stt.text, lang: stt.lang, channel: "voice" });
-        if (stt.text) await ask(alias, stt.text, { lang: stt.lang, channel: `${kind}-voice` });
-      } else if (m.type === "demo_say") {
-        // Hardcoded watch demo: Sarvam TTS only. Does not enter the agent loop.
-        const id = String(m.id ?? "");
-        const text = String(m.text ?? "").slice(0, 1400);
-        const lang = String(m.lang || "hi-IN");
-        bus.feed({ agent: `coach:${alias}`, kind: "say", person: alias, text });
-        const audio = await speak(text, lang).catch((err) => {
-          console.warn("[demo_say]", (err as Error).message);
-          return null;
-        });
-        ws.send(JSON.stringify({ type: "demo_audio", id, text, audio_url: audio?.url ?? null, lang: audio?.lang ?? lang }));
-      } else if (m.type === "demo_hear") {
-        // Hardcoded watch demo: Sarvam STT only. The watch decides what "हाँ" means.
-        const id = String(m.id ?? "");
-        try {
-          const sttDemo = await transcribe(Buffer.from(String(m.wav_base64), "base64"));
-          ws.send(JSON.stringify({ type: "demo_heard", id, text: sttDemo.text, lang: sttDemo.lang }));
-        } catch (err) {
-          console.warn("[demo_hear]", (err as Error).message);
-          ws.send(JSON.stringify({ type: "demo_heard", id, text: "" }));
-        }
+        if (stt.text && !(await trySpokenMorning(alias, stt.text))) await ask(alias, stt.text, { lang: stt.lang, channel: `${kind}-voice` });
       }
     } catch (e) {
       ws.send(JSON.stringify({ type: "error", error: (e as Error).message }));
