@@ -101,6 +101,20 @@ The graph is never the bottleneck. A full voice round trip (Sarvam STT → Coach
 
 ## How it works
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/architecture-dark.png" />
+  <img src="docs/img/architecture-light.png" alt="HomeOS architecture: the watch, ring and ESP32 feed the HomeOS server's agent team (1 Sense, 2 Notice, 3 Decide, 4 Act, 5 Learn & explain); agents read through MCP and write through the Write API into FalkorDB, where each person's private graph shares only a range and priority with the shared home graph; agents act on the room light, fan and AC, the breathing pacer and spoken answers, using Azure OpenAI and Sarvam." width="100%" />
+</picture>
+
+**Tech stack**
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/tech-stack-dark.png" />
+  <img src="docs/img/tech-stack-light.png" alt="HomeOS tech stack. Wearables and mobile: Wear OS, Android, Kotlin, Jetpack Compose. Server and agents: Node.js, TypeScript, Express, MCP. Graph memory: FalkorDB, Docker. Room hardware: ESP32, ESPHome. AI and voice: Azure OpenAI, Sarvam. Web and 3D: React, Vite, Framer Motion, GSAP, three.js." width="100%" />
+</picture>
+
+Both images are generated from [`docs/architecture/`](docs/architecture). The detailed flow:
+
 ```mermaid
 flowchart LR
   subgraph Wearables
