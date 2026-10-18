@@ -4,16 +4,23 @@ import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 
-const worldFile = resolve(dirname(fileURLToPath(import.meta.url)), "../frontned 3d/index.html");
+const worldDir = resolve(dirname(fileURLToPath(import.meta.url)), "../frontned 3d");
+const worldPages: Record<string, { file: string; type: string }> = {
+  "/world": { file: "index.html", type: "text/html; charset=utf-8" },
+  "/world/": { file: "index.html", type: "text/html; charset=utf-8" },
+  "/world/index.html": { file: "index.html", type: "text/html; charset=utf-8" },
+  "/world/quest.js": { file: "quest.js", type: "text/javascript; charset=utf-8" },
+};
 
-/** Serves the walkable house at /world/ in dev, preview, and the production build. */
+/** Serves the walkable house, and its quest, at /world/. */
 function homeosWorld(): Plugin {
   const send = (req: { url?: string }, res: { statusCode: number; setHeader: (k: string, v: string) => void; end: (b: Buffer) => void }, next: () => void) => {
     const path = req.url?.split("?")[0] ?? "";
-    if (path !== "/world" && path !== "/world/" && path !== "/world/index.html") return next();
+    const page = worldPages[path];
+    if (!page) return next();
     res.statusCode = 200;
-    res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.end(readFileSync(worldFile));
+    res.setHeader("Content-Type", page.type);
+    res.end(readFileSync(resolve(worldDir, page.file)));
   };
   return {
     name: "homeos-world",
@@ -24,7 +31,16 @@ function homeosWorld(): Plugin {
       server.middlewares.use(send);
     },
     generateBundle() {
-      this.emitFile({ type: "asset", fileName: "world/index.html", source: readFileSync(worldFile) });
+      this.emitFile({
+        type: "asset",
+        fileName: "world/index.html",
+        source: readFileSync(resolve(worldDir, "index.html")),
+      });
+      this.emitFile({
+        type: "asset",
+        fileName: "world/quest.js",
+        source: readFileSync(resolve(worldDir, "quest.js")),
+      });
     },
   };
 }
