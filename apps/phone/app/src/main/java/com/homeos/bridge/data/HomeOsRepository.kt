@@ -322,9 +322,13 @@ private fun List<Device>.patch(event: UiEvent.DeviceChanged): List<Device> = map
             setpoint = if (s.has("setpoint")) s.optInt("setpoint") else device.setpoint,
             level = if (s.has("level")) s.optInt("level") else device.level,
             brightness = if (s.has("brightness")) s.optInt("brightness") else device.brightness,
-            temperature = if (s.has("temperature")) s.optDouble("temperature").toFloat() else device.temperature,
-            humidity = if (s.has("humidity")) s.optDouble("humidity").toFloat() else device.humidity,
-            bright = if (s.has("bright")) s.optDouble("bright").toFloat() else device.bright,
+            // `?:` rather than `if (has)`, because these three had no NaN guard at all: a device
+            // delta for the env sensor carries `bright` as a boolean, `optDouble` returned NaN,
+            // and NaN went straight into state. Falling back to the previous value also gives the
+            // behaviour this function is for - a delta omits what has not changed.
+            temperature = s.floatOrNull("temperature") ?: device.temperature,
+            humidity = s.floatOrNull("humidity") ?: device.humidity,
+            bright = s.brightnessOrNull("bright") ?: device.bright,
         )
     }
 }

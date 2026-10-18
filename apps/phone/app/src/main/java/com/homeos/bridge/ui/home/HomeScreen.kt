@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -40,9 +41,11 @@ import com.homeos.bridge.ui.components.SectionHeader
 import com.homeos.bridge.ui.components.Sparkline
 import com.homeos.bridge.ui.components.StatReadout
 import com.homeos.bridge.ui.components.StatusDot
+import com.homeos.bridge.ui.components.Viewport
 import com.homeos.bridge.ui.components.blockMargin
 import com.homeos.bridge.ui.components.readoutValue
 import com.homeos.bridge.ui.icons.HomeOsIcons
+import com.homeos.bridge.ui.room.RoomView
 import kotlin.math.roundToInt
 
 /**
@@ -258,7 +261,14 @@ fun HomeScreen(
             }
         }
 
-        item(key = "room") { RoomBlock(state = state, modifier = blockGutter) }
+        item(key = "room") {
+            RoomPanel(
+                state = state,
+                modifier = edgeGutter,
+                onOpenDevice = onOpenDevice,
+                onAddAppliance = onAddAppliance,
+            )
+        }
 
         item(key = "appliances-header") {
             SectionHeader(
@@ -299,62 +309,59 @@ fun HomeScreen(
 }
 
 /**
- * The room itself: what the sensor reads.
+ * The room, live and in three dimensions.
  *
- * The appliances moved out into their own scrollable strip, so this block answers one question —
- * what is it like in here — instead of being a list with a header stapled on.
+ * This is the screen's hero and the thing the product is. A list of device states is a list; a home
+ * is a place, and the fastest way to say "the light in your bedroom is on at forty percent" is to
+ * show the room with the light on at forty percent in it.
+ *
+ * The numbers stay outside the window. The model is atmosphere and structure — it answers *what is
+ * this room like* — and anything that has to be read precisely sits in the heading above it, where
+ * it is on a flat surface at full contrast.
  */
 @Composable
-private fun RoomBlock(state: AppState, modifier: Modifier = Modifier) {
-    val colors = HomeOs.colors
-    val type = HomeOs.type
+private fun RoomPanel(
+    state: AppState,
+    onOpenDevice: (Device) -> Unit,
+    onAddAppliance: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val temperature = state.home.roomTemperature
     val humidity = state.home.roomHumidity
+    val readout = buildString {
+        if (temperature != null) append("%.1f °C".format(temperature))
+        if (temperature != null && humidity != null) append("  ·  ")
+        if (humidity != null) append("${humidity.roundToInt()}%")
+    }
 
-    PaperBlock(modifier = modifier, plate = Plate.Home) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(
-                HomeOsIcons.thermostat,
-                contentDescription = null,
-                tint = colors.violetInk,
-                modifier = Modifier.size(18.dp),
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SectionHeader(
+            title = "The room",
+            trailing = state.home.devices.firstOrNull()?.room?.ifEmpty { "bedroom" } ?: "bedroom",
+        )
+        Viewport(
+            height = 320.dp,
+            hint = "drag to turn · tap a device",
+            trailing = readout.ifEmpty { null },
+        ) {
+            RoomView(
+                devices = state.home.devices,
+                modifier = Modifier.fillMaxSize(),
+                onSelect = { anchor ->
+                    val device = anchor?.bind?.let { id ->
+                        state.home.devices.firstOrNull { it.id == id }
+                    }
+                    when {
+                        // Something HomeOS drives: open what it is doing and why.
+                        device != null -> onOpenDevice(device)
+                        // Something it could drive but does not yet: offer to connect it. Tapping
+                        // the television and getting nothing back is the model looking broken;
+                        // tapping it and being offered the catalogue is the model being a way in.
+                        anchor != null -> onAddAppliance()
+                        else -> Unit
+                    }
+                },
             )
-            Text("THE ROOM", style = type.micro, color = colors.inkMuted)
-            Spacer(Modifier.weight(1f))
-            Text(
-                state.home.devices.firstOrNull()?.room?.ifEmpty { "bedroom" } ?: "bedroom",
-                style = type.micro,
-                color = colors.inkMuted,
-            )
-        }
-
-        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            Column {
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        if (temperature != null) "%.1f".format(temperature) else readoutValue(null),
-                        style = type.readout,
-                        color = if (temperature != null) colors.ink else colors.inkMuted.copy(alpha = 0.45f),
-                    )
-                    if (temperature != null) Text(" °C", style = type.caption, color = colors.inkMuted)
-                }
-                Text("temperature", style = type.micro, color = colors.inkMuted)
-            }
-            Column {
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        if (humidity != null) humidity.roundToInt().toString() else readoutValue(null),
-                        style = type.readout,
-                        color = if (humidity != null) colors.ink else colors.inkMuted.copy(alpha = 0.45f),
-                    )
-                    if (humidity != null) Text(" %", style = type.caption, color = colors.inkMuted)
-                }
-                Text("humidity", style = type.micro, color = colors.inkMuted)
-            }
-        }
-
-        if (temperature == null) {
-            Text("The room sensor hasn't reported yet.", style = type.caption, color = colors.inkMuted)
         }
     }
 }

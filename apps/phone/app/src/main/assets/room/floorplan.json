@@ -1,0 +1,81 @@
+{
+  "_": "Adapted from house-control (github.com/0xProbabillity/house-control), MIT, (c) 2026 0xProbability. Metres; x east, z south, y up. Rooms are axis-aligned rectangles; walls are derived from where they touch. `bind` names a device id the HomeOS backend actually drives - everything without one is scenery and the renderer marks it as such.",
+  "version": 1,
+  "name": "Flat 1",
+  "wallHeight": 2.6,
+  "interiorWallHeight": 1.25,
+  "camera": { "azimuth": -34, "elevation": 47 },
+
+  "rooms": [
+    { "id": "bedroom", "name": "Bedroom", "rect": [0, 0, 4.2, 3.6], "floor": "walnut", "connected": true },
+    { "id": "bath", "name": "Bathroom", "rect": [4.2, 0, 2.2, 3.6], "floor": "tile" },
+    { "id": "kitchen", "name": "Kitchen", "rect": [6.4, 0, 4.0, 3.6], "floor": "stone" },
+    { "id": "living", "name": "Living", "rect": [0, 3.6, 6.4, 4.6], "floor": "oak" },
+    { "id": "dining", "name": "Dining", "rect": [6.4, 3.6, 4.0, 4.6], "floor": "oak" }
+  ],
+
+  "openings": [
+    { "kind": "door", "from": [3.1, 3.6], "to": [4.0, 3.6] },
+    { "kind": "door", "from": [4.7, 3.6], "to": [5.5, 3.6] },
+    { "kind": "open", "from": [6.4, 4.2], "to": [6.4, 7.8] },
+    { "kind": "open", "from": [7.0, 3.6], "to": [10.0, 3.6] },
+    { "kind": "window", "from": [0, 1.0], "to": [0, 2.6] },
+    { "kind": "window", "from": [0, 7.0], "to": [0, 7.9] },
+    { "kind": "window", "from": [0.9, 0], "to": [2.3, 0], "sill": 1.5, "head": 2.2 }
+  ],
+
+  "lights": [
+    { "id": "bedroom.main", "name": "Ceiling", "room": "bedroom", "type": "ceiling", "pos": [2.1, 2.3], "caps": ["brightness", "temp"], "bind": "light" },
+    { "id": "bedroom.left", "name": "Bedside left", "room": "bedroom", "type": "table", "pos": [0.85, 0.4], "y": 0.5, "caps": ["brightness", "color"], "bind": "bulb" },
+    { "id": "bedroom.right", "name": "Bedside right", "room": "bedroom", "type": "table", "pos": [3.35, 0.4], "y": 0.5 },
+    { "id": "living.main", "name": "Ceiling", "room": "living", "type": "ceiling", "pos": [2.9, 6.0], "caps": ["brightness", "temp"] },
+    { "id": "living.floor", "name": "Floor lamp", "room": "living", "type": "floor", "pos": [0.6, 4.2] },
+    { "id": "living.tv", "name": "TV backlight", "room": "living", "type": "strip", "pos": [0.13, 6.0], "y": 1.05, "rot": 90, "length": 1.5, "caps": ["brightness", "color"], "color": "#7b5cff" },
+    { "id": "dining.pendant", "name": "Pendant", "room": "dining", "type": "pendant", "pos": [8.5, 6.4], "y": 1.75, "caps": ["brightness", "temp"] },
+    { "id": "kitchen.spots", "name": "Spots", "room": "kitchen", "type": "spots", "pos": [8.4, 2.0], "caps": ["brightness"] },
+    { "id": "kitchen.strip", "name": "Counter light", "room": "kitchen", "type": "strip", "pos": [8.05, 0.42], "y": 1.42, "length": 2.9, "caps": ["brightness", "temp"] },
+    { "id": "bath.main", "name": "Ceiling", "room": "bath", "type": "ceiling", "pos": [5.2, 2.0], "caps": ["brightness"] },
+    { "id": "bath.mirror", "name": "Mirror light", "room": "bath", "type": "strip", "pos": [4.95, 0.14], "y": 1.95, "length": 0.8, "caps": ["brightness", "temp"] }
+  ],
+
+  "acs": [
+    { "id": "bedroom.ac", "name": "Air conditioner", "room": "bedroom", "wall": "north", "pos": [3.3, 0], "y": 2.2, "min": 18, "max": 30, "bind": "ac" },
+    { "id": "living.ac", "name": "Living AC", "room": "living", "wall": "west", "pos": [0, 4.45], "y": 2.2, "min": 16, "max": 30 }
+  ],
+
+  "fans": [
+    { "id": "bedroom.fan", "name": "Fan", "room": "bedroom", "pos": [2.1, 1.5], "y": 2.34, "bind": "fan" }
+  ],
+
+  "sensors": [
+    { "id": "bedroom.env", "name": "Room sensor", "room": "bedroom", "wall": "east", "pos": [4.2, 1.9], "y": 1.5, "bind": "env" }
+  ],
+
+  "furniture": [
+    { "piece": "rug", "room": "bedroom", "pos": [2.1, 2.3], "size": [2.6, 1.6], "color": "#6a5a52" },
+    { "piece": "bed", "room": "bedroom", "pos": [2.1, 1.2], "width": 1.7, "color": "#7f8fb5" },
+    { "piece": "nightstand", "room": "bedroom", "pos": [0.85, 0.4] },
+    { "piece": "nightstand", "room": "bedroom", "pos": [3.35, 0.4] },
+    { "piece": "dresser", "room": "bedroom", "pos": [3.87, 2.5], "rot": -90, "width": 1.3 },
+    { "piece": "plant", "room": "bedroom", "pos": [0.45, 3.15], "height": 0.9 },
+
+    { "piece": "rug", "room": "living", "pos": [2.3, 6.0], "size": [2.5, 3.1], "color": "#3b4a66" },
+    { "piece": "tv", "room": "living", "pos": [0.32, 6.0], "rot": 90, "width": 1.7 },
+    { "piece": "sofa", "room": "living", "pos": [3.95, 6.0], "rot": -90, "width": 2.5, "color": "#8b93a7" },
+    { "piece": "coffeeTable", "room": "living", "pos": [2.3, 6.0], "rot": 90, "width": 1.1 },
+    { "piece": "armchair", "room": "living", "pos": [1.9, 4.35], "rot": 12, "color": "#c28a5a" },
+    { "piece": "plant", "room": "living", "pos": [0.5, 7.65], "height": 1.5 },
+    { "piece": "sideboard", "room": "living", "pos": [5.2, 7.85], "rot": 180, "width": 1.6 },
+
+    { "piece": "diningSet", "room": "dining", "pos": [8.5, 6.4], "width": 1.9, "chairs": 6 },
+    { "piece": "island", "room": "dining", "pos": [8.5, 3.75], "width": 2.2, "stools": 3 },
+    { "piece": "plant", "room": "dining", "pos": [9.95, 7.75], "height": 1.1 },
+
+    { "piece": "kitchen", "room": "kitchen", "pos": [8.05, 0.41], "width": 3.1, "upper": true },
+    { "piece": "fridge", "room": "kitchen", "pos": [10.02, 0.45] },
+
+    { "piece": "vanity", "room": "bath", "pos": [4.95, 0.38], "width": 1.0 },
+    { "piece": "bathtub", "room": "bath", "pos": [5.92, 1.35], "rot": 90 },
+    { "piece": "toilet", "room": "bath", "pos": [4.58, 2.5], "rot": 90 }
+  ]
+}
