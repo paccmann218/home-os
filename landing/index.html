@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HomeOS · a home with a nervous system</title>
+    <meta
+      name="description"
+      content="HomeOS links your watch, ring and room sensors to a team of agents. It adjusts the room, learns what actually helps your body, and tells you why, with each person's memory kept private in FalkorDB."
+    />
+    <meta name="theme-color" content="#fffbf5" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#120e0b" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <script>
+      // Apply a saved theme before first paint so the page never flashes the wrong mode.
+      (function () {
+        try {
+          var t = localStorage.getItem("homeos-theme");
+          if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

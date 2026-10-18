@@ -1,0 +1,12 @@
+{
+  "name": "HOUSE, AWAKE",
+  "description": "",
+  "version": 2,
+  "build": "915320386533",
+  "engine": "Crayon Engine",
+  "generatedAt": "2026-10-18T05:31:23.233Z",
+  "platforms": [
+    "Web"
+  ],
+  "controls": "Keyboard / Touch"
+}
