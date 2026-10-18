@@ -210,7 +210,7 @@ fun HomeOsTopBar(
             Text(
                 buildAnnotatedString {
                     append("Home")
-                    withStyle(SpanStyle(color = colors.teal)) { append("OS") }
+                    withStyle(SpanStyle(color = colors.lens)) { append("OS") }
                 },
                 style = type.section,
                 color = colors.onShell,
@@ -279,14 +279,6 @@ fun HomeOsDock(
                 bottom = navBars.calculateBottomPadding() + ShellDims.dockGap,
             ),
     ) {
-        // The offset behind the dock, so it is a block that happens to be see-through rather than
-        // a bubble floating over a field of blocks.
-        Box(
-            Modifier
-                .matchParentSize()
-                .offset(x = HomeOsDims.plateOffset, y = HomeOsDims.plateOffset)
-                .background(colors.plateShadow, HomeOsShapes.pill),
-        )
         GlassSurface(
             level = GlassLevel.Dock,
             shape = HomeOsShapes.pill,
@@ -299,10 +291,12 @@ fun HomeOsDock(
                     .slidingLens(
                         position = position,
                         count = Destination.entries.size,
-                        accent = colors.teal,
+                        // Brighter glass rather than a colour: see the `glass` note on the lens.
+                        accent = colors.paper.copy(alpha = 0.58f),
                         light = colors.specular,
                         shade = colors.ink,
                         inset = 7.dp,
+                        glass = true,
                     ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -327,13 +321,19 @@ private fun DockItem(
     modifier: Modifier = Modifier,
 ) {
     val colors = HomeOs.colors
+    // The accent marks the destination from inside the pane now, rather than being the pane.
+    //
+    // Unselected is full ink rather than the muted tone, because the dock is the most transparent
+    // surface in the app and the muted tone measured 2.6:1 over the worst backdrop it can float
+    // across. Nothing is lost: what separates the current tab is the pane and the filled glyph,
+    // not a difference in text weight.
     val iconTint by animateColorAsState(
-        targetValue = if (selected) colors.ink else colors.inkMuted,
+        targetValue = if (selected) colors.lens else colors.ink,
         animationSpec = Motion.effects(),
         label = "dockIcon",
     )
     val labelTint by animateColorAsState(
-        targetValue = if (selected) colors.ink else colors.inkMuted,
+        targetValue = if (selected) colors.lens else colors.ink,
         animationSpec = Motion.effects(),
         label = "dockLabel",
     )

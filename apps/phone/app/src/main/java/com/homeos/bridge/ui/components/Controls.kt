@@ -113,6 +113,17 @@ fun Modifier.slidingLens(
     light: Color,
     shade: Color,
     inset: Dp = HomeOsDims.lensInset,
+    /**
+     * Whether the lens is a block of colour or a brighter pane of the same glass.
+     *
+     * On the dock it is glass. A solid capsule on a translucent bar is the one shape that cannot
+     * be made to look like it belongs there — it is opaque where everything around it is not, so
+     * it reads as a sticker on a window however well it is coloured. A pane that is simply
+     * *brighter glass*, with its own specular edge, is what a selected tab looks like in every
+     * interface that does this convincingly, and it leaves the accent free to do the marking from
+     * inside, on the icon and the label, where it is legible at 5.4:1.
+     */
+    glass: Boolean = false,
 ): Modifier = drawBehind {
     if (count <= 0) return@drawBehind
     val slot = size.width / count
@@ -128,24 +139,49 @@ fun Modifier.slidingLens(
     // a vertical brush in Compose is positioned in the draw scope, not in the rect it fills, so
     // drawing the capsule in place would light it from the top of the row instead of its own top.
     translate(left = slot * position + insetX, top = insetY) {
-        // A solid accent capsule with an ink outline, not a tinted pane. On a cream surface a 14%
-        // wash is invisible; the capsule has to be a filled shape or the selected destination is
-        // carried by the label weight alone.
-        drawRoundRect(brush = SolidColor(accent), size = rect, cornerRadius = radius)
-        drawRoundRect(
-            brush = Brush.verticalGradient(
-                0.00f to light.copy(alpha = 0.40f),
-                0.55f to Color.Transparent,
-            ),
-            size = rect,
-            cornerRadius = radius,
-        )
-        drawRoundRect(
-            brush = SolidColor(shade),
-            size = rect,
-            cornerRadius = radius,
-            style = Stroke(HomeOsDims.border.toPx()),
-        )
+        if (glass) {
+            // Brighter glass, lit from above, with a specular edge that catches at the top and
+            // falls to a hairline at the bottom. Three strokes and no outline.
+            drawRoundRect(brush = SolidColor(accent), size = rect, cornerRadius = radius)
+            drawRoundRect(
+                brush = Brush.verticalGradient(
+                    0.00f to light.copy(alpha = 0.55f),
+                    0.60f to Color.Transparent,
+                ),
+                size = rect,
+                cornerRadius = radius,
+            )
+            drawRoundRect(
+                brush = Brush.verticalGradient(
+                    0.00f to light.copy(alpha = 0.95f),
+                    0.30f to light.copy(alpha = 0.22f),
+                    0.78f to Color.Transparent,
+                    1.00f to shade.copy(alpha = 0.22f),
+                ),
+                size = rect,
+                cornerRadius = radius,
+                style = Stroke(HomeOsDims.glassEdge.toPx()),
+            )
+        } else {
+            // A solid accent capsule with an ink outline, not a tinted pane. On a cream surface a
+            // 14% wash is invisible; a capsule on an opaque track has to be a filled shape or the
+            // selected option is carried by the label weight alone.
+            drawRoundRect(brush = SolidColor(accent), size = rect, cornerRadius = radius)
+            drawRoundRect(
+                brush = Brush.verticalGradient(
+                    0.00f to light.copy(alpha = 0.40f),
+                    0.55f to Color.Transparent,
+                ),
+                size = rect,
+                cornerRadius = radius,
+            )
+            drawRoundRect(
+                brush = SolidColor(shade),
+                size = rect,
+                cornerRadius = radius,
+                style = Stroke(HomeOsDims.border.toPx()),
+            )
+        }
     }
 }
 
@@ -166,7 +202,7 @@ fun GlassSegmented(
     selected: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    accent: Color = HomeOs.colors.teal,
+    accent: Color = HomeOs.colors.lens,
 ) {
     val colors = HomeOs.colors
     val type = HomeOs.type
@@ -184,8 +220,8 @@ fun GlassSegmented(
                 position = position,
                 count = segments.size,
                 accent = accent,
-                light = colors.onShell,
-                shade = colors.shellSunk,
+                light = colors.specular,
+                shade = colors.ink,
                 inset = 5.dp,
             ),
         verticalAlignment = Alignment.CenterVertically,
@@ -204,14 +240,14 @@ fun GlassSegmented(
                 Text(
                     segment.label,
                     style = if (segment.mono) type.monoMicro else type.label,
-                    color = if (on) accent else colors.onShellMuted,
+                    color = if (on) colors.onLens else colors.inkMuted,
                     textAlign = TextAlign.Center,
                 )
                 segment.sub?.let {
                     Text(
                         it,
                         style = type.micro,
-                        color = if (on) colors.onShell else colors.onShellMuted.copy(alpha = 0.75f),
+                        color = if (on) colors.onLens else colors.inkMuted.copy(alpha = 0.75f),
                         textAlign = TextAlign.Center,
                     )
                 }
