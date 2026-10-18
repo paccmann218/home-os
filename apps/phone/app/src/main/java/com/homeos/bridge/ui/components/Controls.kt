@@ -36,6 +36,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
@@ -127,35 +128,23 @@ fun Modifier.slidingLens(
     // a vertical brush in Compose is positioned in the draw scope, not in the rect it fills, so
     // drawing the capsule in place would light it from the top of the row instead of its own top.
     translate(left = slot * position + insetX, top = insetY) {
+        // A solid accent capsule with an ink outline, not a tinted pane. On a cream surface a 14%
+        // wash is invisible; the capsule has to be a filled shape or the selected destination is
+        // carried by the label weight alone.
+        drawRoundRect(brush = SolidColor(accent), size = rect, cornerRadius = radius)
         drawRoundRect(
             brush = Brush.verticalGradient(
-                0.00f to light.copy(alpha = 0.15f),
-                0.48f to accent.copy(alpha = 0.14f),
-                1.00f to accent.copy(alpha = 0.07f),
+                0.00f to light.copy(alpha = 0.40f),
+                0.55f to Color.Transparent,
             ),
             size = rect,
             cornerRadius = radius,
         )
         drawRoundRect(
-            brush = Brush.verticalGradient(
-                0.00f to light.copy(alpha = 0.55f),
-                0.38f to Color.Transparent,
-                1.00f to shade.copy(alpha = 0.22f),
-            ),
+            brush = SolidColor(shade),
             size = rect,
             cornerRadius = radius,
-            style = Stroke(HomeOsDims.glassEdge.toPx()),
-        )
-        drawRoundRect(
-            brush = Brush.linearGradient(
-                0.00f to accent.copy(alpha = 0.52f),
-                1.00f to accent.copy(alpha = 0.26f),
-                start = Offset.Zero,
-                end = Offset(w, h),
-            ),
-            size = rect,
-            cornerRadius = radius,
-            style = Stroke(HomeOsDims.glassBorder.toPx()),
+            style = Stroke(HomeOsDims.border.toPx()),
         )
     }
 }
@@ -273,14 +262,10 @@ fun GlassChip(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = iconTint,
+            tint = if (selected) colors.ink else colors.inkMuted,
             modifier = Modifier.size(19.dp),
         )
-        Text(
-            text = label,
-            style = HomeOs.type.label,
-            color = if (selected) colors.onShell else colors.onShell.copy(alpha = 0.86f),
-        )
+        Text(text = label, style = HomeOs.type.label, color = colors.ink)
     }
 }
 
@@ -345,9 +330,8 @@ fun GlassIconButton(
             imageVector = icon,
             contentDescription = null,
             tint = when {
-                !enabled -> colors.onShellMuted.copy(alpha = 0.55f)
-                active -> colors.shell
-                else -> colors.onShell
+                !enabled -> colors.inkMuted.copy(alpha = 0.55f)
+                else -> colors.ink
             },
             modifier = Modifier.size(diameter * 0.43f),
         )
@@ -381,7 +365,7 @@ fun GlassAction(
             Icon(
                 icon,
                 contentDescription = null,
-                tint = if (emphatic) accent else colors.onShell,
+                tint = colors.ink,
                 modifier = Modifier.size(18.dp),
             )
             Box(Modifier.size(width = 8.dp, height = 1.dp))
@@ -389,7 +373,7 @@ fun GlassAction(
         Text(
             label,
             style = HomeOs.type.label,
-            color = colors.onShell,
+            color = colors.ink,
             textAlign = TextAlign.Center,
         )
     }

@@ -9,8 +9,11 @@ import androidx.compose.ui.unit.dp
  * scales up for phone-sized surfaces, with children at `outer - padding` so curves stay concentric.
  */
 object HomeOsShapes {
-    val block = RoundedCornerShape(14.dp)
-    val chip = RoundedCornerShape(10.dp)
+    // Tighter than before. The canonical library uses a 5px radius against a 2px border; scaled to
+    // a phone that is a block barely rounded at all, and the softer 14dp was quietly sanding the
+    // style off every corner in the app.
+    val block = RoundedCornerShape(10.dp)
+    val chip = RoundedCornerShape(8.dp)
 
     /** Inset wells and chart plots: 14 - 16 padding clamps to a small positive radius. */
     val well = RoundedCornerShape(6.dp)
@@ -19,11 +22,17 @@ object HomeOsShapes {
 }
 
 object HomeOsDims {
-    /** 2dp, not 1dp. The weight is the style. */
-    val border = 2.dp
+    /**
+     * 3dp. The weight is the style, and 2dp was under-reading at phone density against a bright
+     * field - the border has to be the hardest thing on screen or none of this works.
+     */
+    val border = 3.dp
 
-    /** The hard offset. A pressed block travels exactly this far and lands flush. */
-    val plateOffset = 4.dp
+    /** The hard offset. A pressed block travels exactly this far and lands flush on it. */
+    val plateOffset = 6.dp
+
+    /** The lead block on a screen stands further off the field. */
+    val plateOffsetLead = 9.dp
 
     /**
      * The accent rail: how a supporting block carries its hue without a second hard offset.

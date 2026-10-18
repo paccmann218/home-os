@@ -1,6 +1,8 @@
 package com.homeos.bridge.ui.components
 
 import android.graphics.Bitmap
+import android.graphics.Canvas as AndroidCanvas
+import android.graphics.Paint as AndroidPaint
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -31,11 +33,13 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageShader
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.homeos.bridge.theme.HomeOs
@@ -65,16 +69,20 @@ data class Ambience(
 /** Set by [Shell] so the glass chrome knows what to sample. */
 val LocalHazeState = staticCompositionLocalOf<HazeState?> { null }
 
-private val AmbientCool = Color(0xFF0E293D) //  20 C and below
-private val AmbientNeutral = Color(0xFF0C2628) //  23 C
-private val AmbientWarm = Color(0xFF3F1F10) //  29 C and above
-private val AmbientDeep = Color(0xFF09161C) // the far corner, always
+// The light's own colour, not the field's. Cool at 20 C and below, warm at 29 and above, and
+// close to colourless in between, so an ordinary room does not look like it is on fire.
+internal val AmbientCool = Color(0xFF6FA8FF) //  20 C and below
+internal val AmbientNeutral = Color(0xFFBFEAE6) //  23 C
+internal val AmbientWarm = Color(0xFFFFB166) //  29 C and above
 
 /**
- * Hue follows temperature. Each blob sits only 1.2-1.3:1 above the shell, so this registers as
- * atmosphere rather than as a coloured background competing with the paper blocks on top of it.
+ * Hue follows temperature.
+ *
+ * Internal rather than private because the 3D room tints its air with the same function: two
+ * temperature-to-colour ramps in one app is the bug the projection comment in `GraphView` is a
+ * monument to, in a different costume.
  */
-private fun ambientTint(temperatureC: Float?): Color {
+internal fun ambientTint(temperatureC: Float?): Color {
     val t = temperatureC ?: 23f
     return when {
         t <= 20f -> AmbientCool
@@ -87,11 +95,10 @@ private fun ambientTint(temperatureC: Float?): Color {
 private const val NOISE_TILE = 128
 
 /**
- * One tiled noise bitmap for the whole app, composited over the gradient.
+ * One tiled noise bitmap for the whole app.
  *
- * Large dark gradients band badly on 8-bit panels: you get visible steps where the ramp crosses a
- * quantisation boundary. A few percent of grain dithers those steps away. It is drawn once at the
- * root, never per block.
+ * Large flat fields band badly on 8-bit panels: a wide gradient crosses a quantisation boundary and
+ * you see the step. A few percent of grain dithers it away. Drawn once at the root, never per block.
  */
 @Composable
 private fun rememberGrain(): Brush = remember {
@@ -102,36 +109,52 @@ private fun rememberGrain(): Brush = remember {
     }
     val bitmap = Bitmap.createBitmap(NOISE_TILE, NOISE_TILE, Bitmap.Config.ARGB_8888)
     bitmap.setPixels(pixels, 0, NOISE_TILE, 0, 0, NOISE_TILE, NOISE_TILE)
-    ShaderBrush(
-        ImageShader(bitmap.asImageBitmap(), TileMode.Repeated, TileMode.Repeated),
-    )
-}
-
-private fun DrawScope.blob(color: Color, center: Offset, radius: Float, alpha: Float) {
-    if (alpha <= 0.001f || radius <= 0f) return
-    drawRect(
-        brush = Brush.radialGradient(
-            0.0f to color.copy(alpha = alpha),
-            0.6f to color.copy(alpha = alpha * 0.45f),
-            1.0f to color.copy(alpha = 0f),
-            center = center,
-            radius = radius,
-        ),
-    )
+    ShaderBrush(ImageShader(bitmap.asImageBitmap(), TileMode.Repeated, TileMode.Repeated))
 }
 
 /**
- * The ambient layer: a slow mesh gradient over the shell, plus grain.
+ * The dot grid, as one repeating tile.
  *
- * Two drift periods that do not divide into each other (37s and 53s), so the pattern never
- * visibly loops. The drift is the first thing reduced motion removes, and an empty room stops it
- * too — the gradient still shows the temperature, it just stops moving.
+ * A grid of dots is the one piece of texture this style allows itself, and it is what keeps a flat
+ * bold field from reading as a blank wall. Built as a tiled shader rather than as a few hundred
+ * `drawCircle` calls a frame, for the obvious reason.
+ */
+@Composable
+private fun rememberDotGrid(dotColor: Color): Brush {
+    val density = LocalDensity.current
+    val spacing = with(density) { 22.dp.roundToPx() }.coerceAtLeast(8)
+    val radius = with(density) { 1.6.dp.toPx() }.coerceAtLeast(1f)
+    return remember(spacing, radius, dotColor) {
+        val bitmap = Bitmap.createBitmap(spacing, spacing, Bitmap.Config.ARGB_8888)
+        val canvas = AndroidCanvas(bitmap)
+        val paint = AndroidPaint().apply {
+            isAntiAlias = true
+            color = dotColor.toArgb()
+        }
+        canvas.drawCircle(spacing / 2f, spacing / 2f, radius, paint)
+        ShaderBrush(ImageShader(bitmap.asImageBitmap(), TileMode.Repeated, TileMode.Repeated))
+    }
+}
+
+/**
+ * The field: a flat bold colour, a dot grid, and one light source behind it all.
+ *
+ * The bloom sits high and fades toward the bottom of the screen, so the field reads as lit from
+ * behind rather than as a solid fill — and the dots go *under* it, so they wash out where the light
+ * is strongest and sharpen as it falls away. That gradient is the only soft thing in the design,
+ * which is exactly why it can afford to be there: everything on top of it is a hard-edged block.
+ *
+ * The light still carries the room. Its hue warms as the room warms and cools as it cools, it dims
+ * when the room is dark, and it stops moving entirely when nobody is home. Two drift periods that
+ * do not divide into each other (37s and 53s), so the pattern never visibly loops, and reduced
+ * motion stills it.
  */
 private fun Modifier.ambient(ambience: Ambience): Modifier = composed {
     val colors = HomeOs.colors
     val reduced = HomeOs.reducedMotion
     val moving = ambience.occupied && !reduced
     val grain = rememberGrain()
+    val dots = rememberDotGrid(colors.ink)
 
     val tint by animateColorAsState(
         targetValue = ambientTint(ambience.temperatureC),
@@ -161,36 +184,48 @@ private fun Modifier.ambient(ambience: Ambience): Modifier = composed {
         remember { mutableFloatStateOf(0.6f) }
     }
 
-    val scale = 1f - (ambience.dim.coerceIn(0f, 1f) * 0.55f)
+    val lit = 1f - (ambience.dim.coerceIn(0f, 1f) * 0.45f)
 
     drawBehind {
-        drawRect(colors.shell)
-
         val w = size.width
         val h = size.height
-        // The warm/cool blob leads, high and left, drifting on the slower period.
-        blob(
-            color = tint,
-            center = Offset(w * (0.18f + 0.22f * phaseA), h * (0.10f + 0.10f * phaseB)),
-            radius = maxOf(w, h) * 0.85f,
-            alpha = 0.95f * scale,
+
+        // 1. the field
+        drawRect(colors.shell)
+
+        // 2. the dot grid, at the strength of a texture and not of a pattern
+        drawRect(brush = dots, alpha = 0.16f)
+
+        // 3. the light, behind and above, falling away toward the front
+        drawRect(
+            brush = Brush.radialGradient(
+                0.00f to Color.White.copy(alpha = 0.92f * lit),
+                0.30f to Color.White.copy(alpha = 0.46f * lit),
+                0.62f to Color.White.copy(alpha = 0.14f * lit),
+                1.00f to Color.Transparent,
+                center = Offset(w * (0.28f + 0.14f * phaseA), h * (-0.10f + 0.08f * phaseB)),
+                radius = maxOf(w, h) * 0.78f,
+            ),
         )
-        // A second, cooler mass low and right keeps the field from reading as one flat wash.
-        blob(
-            color = AmbientDeep,
-            center = Offset(w * (0.92f - 0.18f * phaseB), h * (0.78f + 0.14f * phaseA)),
-            radius = maxOf(w, h) * 0.75f,
-            alpha = 0.9f * scale,
+        // The room's own colour, carried by the light rather than by the field, so the field stays
+        // the one flat constant and the temperature is still legible before any number is read.
+        drawRect(
+            brush = Brush.radialGradient(
+                0.00f to tint.copy(alpha = 0.30f * lit),
+                1.00f to Color.Transparent,
+                center = Offset(w * (0.78f - 0.12f * phaseB), h * (0.12f + 0.06f * phaseA)),
+                radius = maxOf(w, h) * 0.70f,
+            ),
         )
-        // A faint highlight opposite the lead blob, so the gradient has a direction.
-        blob(
-            color = tint,
-            center = Offset(w * (0.75f + 0.1f * phaseA), h * (0.34f - 0.12f * phaseB)),
-            radius = maxOf(w, h) * 0.45f,
-            alpha = 0.35f * scale,
+        // 4. and the front falls into shadow, which is what gives the field a direction
+        drawRect(
+            brush = Brush.verticalGradient(
+                0.40f to Color.Transparent,
+                1.00f to colors.ink.copy(alpha = 0.30f),
+            ),
         )
 
-        drawRect(brush = grain, alpha = 0.042f, blendMode = BlendMode.Plus)
+        drawRect(brush = grain, alpha = 0.035f, blendMode = BlendMode.Plus)
     }
 }
 

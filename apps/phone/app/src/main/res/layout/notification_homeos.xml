@@ -52,7 +52,7 @@
             android:fontFamily="@font/inter_variable"
             android:lineSpacingExtra="2dp"
             android:maxLines="2"
-            android:textColor="@color/on_shell"
+            android:textColor="@color/notif_text"
             android:textSize="14sp" />
     </LinearLayout>
 </LinearLayout>

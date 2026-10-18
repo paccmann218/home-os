@@ -71,27 +71,52 @@ class HomeOsColors(
      */
     val stageAwake: Color, val stageRem: Color, val stageLight: Color, val stageDeep: Color,
 ) {
-    /** The 2dp block border — the hardest line on screen. Same ink as body text: 16.10:1 on paper. */
+    /** The block border — the hardest line on screen. Same ink as body text: 16.10:1 on paper. */
     val border: Color get() = ink
+
+    /**
+     * The hard offset behind a block.
+     *
+     * Black, which is the canonical choice and was impossible in every previous version of this
+     * design: on a near-black shell it measured 1.38:1, which is why those versions reached for
+     * chromatic plates instead. On a bright field it measures 10.59:1 and needs no apology.
+     */
+    val plateShadow: Color get() = Color(0xFF0A0C0D)
+
+    /** Highlights on glass. White, because the glass now sits on a light field. */
+    val specular: Color get() = Color.White
+
+    /**
+     * The daylit stage the 3D house stands in: the field, two steps deeper.
+     *
+     * Deeper rather than lighter because the model's walls are [paper], and a cream model on a
+     * cream stage has no silhouette at all. This keeps 2.2:1 under the walls while still reading
+     * as the same material as the rest of the app.
+     */
+    val well: Color get() = Color(0xFF3FB3AA)
 }
 
 /** oklch(L C H) -> sRGB, gamut-mapped. See theme docs for the audit. */
 val HomeOsPalette = HomeOsColors(
-    shell        = Color(0xFF070C0E), // the canvas
-    shellRaised  = Color(0xFF161E22), // 1.16:1 on canvas
-    surfaceHi    = Color(0xFF222D33), // 1.40:1 on canvas
-    overlay      = Color(0xFF2C383F), // 1.63:1 on canvas
-    shellSunk    = Color(0xFF030709), // below the canvas
-    onShell      = Color(0xFFE6ECEC), // 14.14:1 on a card
-    onShellMuted = Color(0xFFA6B3B3), //  7.82:1 on a card
-    onShellFaint = Color(0xFF7D8A8A), //  4.73:1 on a card
+    // The field. Bold, flat and light, because that is what makes the style read as the style:
+    // a black border and a hard black shadow need something bright to be hard against, and on a
+    // near-black background they measured 1.38:1 and vanished. Here they measure 10.59:1.
+    shell        = Color(0xFF5EC9C0),
+    shellRaised  = Color(0xFFF4F1ED), // glass tint, dev surface
+    surfaceHi    = Color(0xFFEAE8E3), // wells inside a block
+    overlay      = Color(0xFFF7F5F2), // sheets
+    // The dark well the two 3D views are windows onto. The only dark surface left.
+    shellSunk    = Color(0xFF0B1012),
+    onShell      = Color(0xFF131719), //  9.10:1 on the field
+    onShellMuted = Color(0xFF3F4347), //  6.22:1 on the field
+    onShellFaint = Color(0xFF5A5F64), //  4.51:1 on the field
 
-    // Paper and ink survive the move to one dark world, but not in the interface. They are the 3D
-    // renderer's materials now: `paper` is the walls of the room and `ink` is the cut through the
-    // top of them. The app's hardest line, in three dimensions.
-    paper        = Color(0xFFF4F1ED), // wall body
-    paperSunk    = Color(0xFFEAE8E3), // wall body, shaded face
-    ink          = Color(0xFF131719), // wall cap
+    // Blocks, and the hardest line on screen. The same two colours do double duty as the 3D
+    // renderer's materials, which is why the walls of the model are literally the app's paper and
+    // the cut through the top of them is literally its ink.
+    paper        = Color(0xFFF4F1ED), // block fill, and the walls of the room
+    paperSunk    = Color(0xFFEAE8E3), // wells, and the shaded face of a wall
+    ink          = Color(0xFF131719), // borders, body text, and the cut through a wall
     inkMuted     = Color(0xFF4F5357),
 
     teal      = Color(0xFF60D3CD), tealInk   = Color(0xFF0B625E), // 10.83:1 shell / 6.37:1 paper

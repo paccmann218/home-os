@@ -1,6 +1,7 @@
 package com.homeos.bridge.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -143,19 +144,20 @@ private fun ApplianceTile(device: Device, onClick: () -> Unit, modifier: Modifie
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            // Ink on the fill, never more of the fill. When the tile itself became a solid
+            // accent block, an accent-tinted icon on an accent-tinted disc was the same colour
+            // three times over and the glyph simply dissolved.
             Box(
                 Modifier
                     .size(36.dp)
-                    .background(
-                        if (live) accent.copy(alpha = 0.18f) else colors.onShell.copy(alpha = 0.07f),
-                        CircleShape,
-                    ),
+                    .background(colors.paper, CircleShape)
+                    .border(HomeOsDims.border, colors.border, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     applianceIcon(device.kind),
                     contentDescription = null,
-                    tint = if (live) accent else colors.onShellMuted,
+                    tint = colors.ink,
                     modifier = Modifier.size(19.dp),
                 )
             }
@@ -164,7 +166,7 @@ private fun ApplianceTile(device: Device, onClick: () -> Unit, modifier: Modifie
                 Icon(
                     HomeOsIcons.lock,
                     contentDescription = "held by ${device.leasedBy}",
-                    tint = colors.amber,
+                    tint = colors.ink,
                     modifier = Modifier.size(14.dp),
                 )
             }
@@ -173,14 +175,14 @@ private fun ApplianceTile(device: Device, onClick: () -> Unit, modifier: Modifie
         Text(
             device.name,
             style = type.label,
-            color = colors.onShell,
+            color = colors.ink,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         Text(
             device.readout(),
             style = type.caption,
-            color = if (live) accent else colors.onShellMuted,
+            color = colors.inkMuted,
         )
     }
 }
