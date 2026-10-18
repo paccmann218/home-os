@@ -86,9 +86,12 @@ private fun rememberReducedMotion(): Boolean {
 private fun HomeOsColors.boosted() = HomeOsColors(
     shell = shell,
     shellRaised = shellRaised,
+    surfaceHi = surfaceHi,
+    overlay = overlay,
     shellSunk = shellSunk,
     onShell = onShell,
     onShellMuted = onShell,
+    onShellFaint = onShell,
     paper = paper,
     paperSunk = paperSunk,
     ink = ink,

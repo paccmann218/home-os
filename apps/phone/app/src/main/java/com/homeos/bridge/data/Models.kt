@@ -21,7 +21,13 @@ internal fun String.repaired(): String =
 private fun JSONObject.stringOrNull(key: String): String? =
     if (isNull(key)) null else optString(key).takeIf { it.isNotEmpty() }
 
-private fun JSONObject.floatOrNull(key: String): Float? =
+/**
+ * Internal rather than private because the socket paths need it too. A JSON `null`, a missing key
+ * and a non-numeric value all have to collapse to `null` rather than to `NaN`, and that decision
+ * belongs in one place: a `NaN` that escapes into state is not a missing reading, it is a poison
+ * value that survives every later arithmetic and renders as nothing at all.
+ */
+internal fun JSONObject.floatOrNull(key: String): Float? =
     if (isNull(key) || !has(key)) null else optDouble(key).takeIf { !it.isNaN() }?.toFloat()
 
 private fun JSONObject.intOrNull(key: String): Int? =
@@ -30,8 +36,12 @@ private fun JSONObject.intOrNull(key: String): Int? =
 /**
  * `bright` arrives as a boolean from the ESP32 driver and as a number from others, so it is
  * normalised to 0-100 here. Reading it as a plain number silently yielded null for the real sensor.
+ *
+ * Also internal, and for a sharper reason than tidiness: `optDouble` on a JSON *boolean* returns
+ * `NaN`, so every path that read `bright` as a number was wrong in a different way. The poll path
+ * used this function and was correct; the two socket paths did not and were not.
  */
-private fun JSONObject.brightnessOrNull(key: String): Float? {
+internal fun JSONObject.brightnessOrNull(key: String): Float? {
     if (!has(key) || isNull(key)) return null
     return when (val raw = opt(key)) {
         is Boolean -> if (raw) 100f else 0f

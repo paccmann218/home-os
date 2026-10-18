@@ -201,12 +201,16 @@ class HomeOsClient(private val baseUrl: () -> String) {
                             hr = data.optDouble("hr").takeIf { !it.isNaN() }?.toFloat(),
                             rmssd = data.optDouble("rmssd").takeIf { !it.isNaN() }?.toFloat(),
                         )
+                        // Through the same normalisers the poll path uses. `bright` is a JSON
+                        // boolean from the ESP32 and `optDouble` on a boolean returns NaN, so
+                        // reading it as a number nulled the live value on every single event and
+                        // the only brightness that ever arrived came from the 6s poll behind it.
                         "room" -> UiEvent.Room(
                             LiveRoom(
                                 at = data.optLong("t"),
-                                temperature = data.optDouble("temperature").takeIf { !it.isNaN() }?.toFloat(),
-                                humidity = data.optDouble("humidity").takeIf { !it.isNaN() }?.toFloat(),
-                                bright = data.optDouble("bright").takeIf { !it.isNaN() }?.toFloat(),
+                                temperature = data.floatOrNull("temperature"),
+                                humidity = data.floatOrNull("humidity"),
+                                bright = data.brightnessOrNull("bright"),
                             ),
                         )
                         "device" -> UiEvent.DeviceChanged(

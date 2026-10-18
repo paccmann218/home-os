@@ -22,16 +22,32 @@ import androidx.compose.ui.graphics.Color
  */
 @Immutable
 class HomeOsColors(
-    /** Behind everything. The ambient gradient is drawn over this. */
+    /**
+     * The elevation ramp.
+     *
+     * Four steps, each perceptible (1.16-1.20:1) and none of them a slab. This replaced a design
+     * that separated surfaces by raw value contrast — near-white blocks at 17:1 on a near-black
+     * field — which is one of the two reliable tells that an interface was generated rather than
+     * designed. The other is a border on every card, which is why [border] is now spent on the 3D
+     * renderer and a hairline here is 8% of [onShell].
+     *
+     * Depth comes from luminance, not from lines.
+     */
     val shell: Color,
-    /** Glass tint base, and the dev-mode surface. */
+    /** One step up: cards, list rows, the normal content surface. Also the glass tint base. */
     val shellRaised: Color,
-    /** Below the shell: the scrim behind a sheet. */
+    /** Two steps up: nested wells, inputs, chart plots, pressed states. */
+    val surfaceHi: Color,
+    /** Three steps up: sheets and dialogs, the only surfaces allowed to float. */
+    val overlay: Color,
+    /** Below the shell: the scrim behind a sheet, and the graph viewport's field. */
     val shellSunk: Color,
-    /** Shell-level text. 15.81:1. Tone 93, never white — pure white haloes on a dark field. */
+    /** Primary text. 14.14:1 on a card. Tone 93, never white — pure white haloes on a dark field. */
     val onShell: Color,
-    /** The floor for shell text that carries meaning. 7.29:1. */
+    /** Captions, labels, secondary values. 7.82:1 on a card. */
     val onShellMuted: Color,
+    /** Micro labels, units, axis ticks. 4.73:1 on a card — still clears AA body text. */
+    val onShellFaint: Color,
 
     /** Block fill. Warm off-white, never #FFF. */
     val paper: Color,
@@ -61,16 +77,22 @@ class HomeOsColors(
 
 /** oklch(L C H) -> sRGB, gamut-mapped. See theme docs for the audit. */
 val HomeOsPalette = HomeOsColors(
-    shell        = Color(0xFF070F0F), // oklch(0.16 0.012 200)
-    shellRaised  = Color(0xFF141C1D), // oklch(0.22 0.013 200)
-    shellSunk    = Color(0xFF030707), // oklch(0.12 0.011 200)
-    onShell      = Color(0xFFE2EAEA), // oklch(0.93 0.008 200)  15.81:1 on shell
-    onShellMuted = Color(0xFF96A1A1), // oklch(0.70 0.012 200)   7.29:1 on shell
+    shell        = Color(0xFF070C0E), // the canvas
+    shellRaised  = Color(0xFF161E22), // 1.16:1 on canvas
+    surfaceHi    = Color(0xFF222D33), // 1.40:1 on canvas
+    overlay      = Color(0xFF2C383F), // 1.63:1 on canvas
+    shellSunk    = Color(0xFF030709), // below the canvas
+    onShell      = Color(0xFFE6ECEC), // 14.14:1 on a card
+    onShellMuted = Color(0xFFA6B3B3), //  7.82:1 on a card
+    onShellFaint = Color(0xFF7D8A8A), //  4.73:1 on a card
 
-    paper        = Color(0xFFF4F1ED), // oklch(0.96 0.006 85)   17.25:1 on shell
-    paperSunk    = Color(0xFFEAE8E3), // oklch(0.93 0.007 85)
-    ink          = Color(0xFF131719), // oklch(0.20 0.008 240)  16.10:1 on paper
-    inkMuted     = Color(0xFF4F5357), // oklch(0.44 0.008 240)   6.90:1 on paper
+    // Paper and ink survive the move to one dark world, but not in the interface. They are the 3D
+    // renderer's materials now: `paper` is the walls of the room and `ink` is the cut through the
+    // top of them. The app's hardest line, in three dimensions.
+    paper        = Color(0xFFF4F1ED), // wall body
+    paperSunk    = Color(0xFFEAE8E3), // wall body, shaded face
+    ink          = Color(0xFF131719), // wall cap
+    inkMuted     = Color(0xFF4F5357),
 
     teal      = Color(0xFF60D3CD), tealInk   = Color(0xFF0B625E), // 10.83:1 shell / 6.37:1 paper
     violet    = Color(0xFFB6A2F3), violetInk = Color(0xFF543A8B), //  8.73:1 shell / 7.96:1 paper

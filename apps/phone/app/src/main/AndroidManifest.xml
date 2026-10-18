@@ -41,6 +41,12 @@
             </intent-filter>
         </activity>
 
+        <!-- Throwaway renderer bench. Delete with com.homeos.bridge.lab once the numbers are in. -->
+        <activity
+            android:name=".lab.LabActivity"
+            android:exported="true"
+            android:label="HomeOS renderer bench" />
+
         <!-- Sync trigger for adb (see SyncReceiver in SyncWorker.kt). DUMP = only the shell/system can send it. -->
         <receiver
             android:name=".SyncReceiver"
