@@ -1,19 +1,19 @@
 {
   "ops": 140,
-  "wall_ms": 113,
-  "ops_per_s": 1243,
+  "wall_ms": 134,
+  "ops_per_s": 1049,
   "writes": {
     "n": 100,
-    "p50_ms": 56.4,
-    "p95_ms": 85
+    "p50_ms": 65.5,
+    "p95_ms": 100.9
   },
   "reads": {
     "n": 40,
-    "p50_ms": 74.6,
-    "p95_ms": 93.4
+    "p50_ms": 83,
+    "p95_ms": 104.7
   },
   "evidence_n_increment": 40,
   "lease_winners": 1,
   "tasks_claimed": 20,
-  "at": "2026-10-17T13:17:24.753Z"
+  "at": "2026-10-17T14:40:01.056Z"
 }
