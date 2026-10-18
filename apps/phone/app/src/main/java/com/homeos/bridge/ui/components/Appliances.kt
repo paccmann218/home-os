@@ -1,7 +1,6 @@
 package com.homeos.bridge.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -103,8 +102,6 @@ fun AppliancePanel(
     onAddAppliance: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = HomeOs.colors
-
     LazyRow(
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(horizontal = HomeOsDims.screenMargin),
@@ -124,25 +121,33 @@ private fun ApplianceTile(device: Device, onClick: () -> Unit, modifier: Modifie
     val colors = HomeOs.colors
     val type = HomeOs.type
     val live = device.isOn || device.isSensor
-    val plate = when {
-        device.leasedBy != null -> Plate.Attention
-        live -> Plate.Home
-        else -> Plate.None
+    // Held beats on: a lease is the more interesting fact about a device, because it is the one
+    // that explains why tapping it will not change anything.
+    val accent = when {
+        device.leasedBy != null -> colors.amber
+        live -> colors.violet
+        else -> colors.onShellMuted
     }
 
-    PaperBlock(
-        modifier = modifier.width(132.dp),
-        plate = plate,
-        onClick = onClick,
-        padding = PaddingValues(14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+    Column(
+        modifier
+            .width(136.dp)
+            .height(134.dp)
+            .pressable(onClick = onClick, label = device.name)
+            .frostedSurface(
+                shape = HomeOsShapes.block,
+                selection = if (live || device.leasedBy != null) 1f else 0f,
+                accent = accent,
+            )
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier
-                    .size(38.dp)
+                    .size(36.dp)
                     .background(
-                        if (live) plate.ink(colors).copy(alpha = 0.14f) else colors.paperSunk,
+                        if (live) accent.copy(alpha = 0.18f) else colors.onShell.copy(alpha = 0.07f),
                         CircleShape,
                     ),
                 contentAlignment = Alignment.Center,
@@ -150,8 +155,8 @@ private fun ApplianceTile(device: Device, onClick: () -> Unit, modifier: Modifie
                 Icon(
                     applianceIcon(device.kind),
                     contentDescription = null,
-                    tint = if (live) plate.ink(colors) else colors.inkMuted,
-                    modifier = Modifier.size(20.dp),
+                    tint = if (live) accent else colors.onShellMuted,
+                    modifier = Modifier.size(19.dp),
                 )
             }
             Spacer(Modifier.weight(1f))
@@ -159,22 +164,23 @@ private fun ApplianceTile(device: Device, onClick: () -> Unit, modifier: Modifie
                 Icon(
                     HomeOsIcons.lock,
                     contentDescription = "held by ${device.leasedBy}",
-                    tint = colors.amberInk,
+                    tint = colors.amber,
                     modifier = Modifier.size(14.dp),
                 )
             }
         }
+        Spacer(Modifier.weight(1f))
         Text(
             device.name,
             style = type.label,
-            color = colors.ink,
+            color = colors.onShell,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         Text(
             device.readout(),
             style = type.caption,
-            color = if (live) plate.ink(colors) else colors.inkMuted,
+            color = if (live) accent else colors.onShellMuted,
         )
     }
 }
@@ -183,22 +189,21 @@ private fun ApplianceTile(device: Device, onClick: () -> Unit, modifier: Modifie
 private fun AddApplianceTile(onClick: () -> Unit, modifier: Modifier = Modifier) {
     val colors = HomeOs.colors
     val type = HomeOs.type
-    val dash = colors.onShellMuted.copy(alpha = 0.55f)
+    val dash = colors.onShell.copy(alpha = 0.30f)
 
     Column(
         modifier
-            .width(132.dp)
-            .height(140.dp)
+            .width(136.dp)
+            .height(134.dp)
+            .pressable(onClick = onClick, label = "Add appliance")
             .clip(HomeOsShapes.block)
-            .clickable(onClick = onClick)
-            // Dashed rather than solid: this is a slot, not an object, and a broken outline is the
-            // oldest and clearest way to say so. It stays on the shell with no paper fill, so it
-            // reads as an absence rather than as another block.
+            // Dashed rather than solid, and with no fill at all: this is a slot, not an object, and
+            // a broken outline over bare shell is the oldest and clearest way to say so.
             .drawBehind {
                 drawRoundRect(
                     color = dash,
                     style = Stroke(
-                        width = HomeOsDims.border.toPx(),
+                        width = HomeOsDims.glassBorder.toPx() * 1.5f,
                         pathEffect = PathEffect.dashPathEffect(
                             floatArrayOf(9.dp.toPx(), 7.dp.toPx()),
                         ),
@@ -207,11 +212,11 @@ private fun AddApplianceTile(onClick: () -> Unit, modifier: Modifier = Modifier)
                 )
             }
             .padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Box(
             Modifier
-                .size(38.dp)
+                .size(36.dp)
                 .background(colors.onShell.copy(alpha = 0.08f), CircleShape),
             contentAlignment = Alignment.Center,
         ) {
@@ -219,7 +224,7 @@ private fun AddApplianceTile(onClick: () -> Unit, modifier: Modifier = Modifier)
                 HomeOsIcons.add,
                 contentDescription = null,
                 tint = colors.onShell,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(19.dp),
             )
         }
         Spacer(Modifier.weight(1f))
@@ -247,7 +252,7 @@ fun DeviceDetail(
     val plate = if (live) Plate.Home else Plate.None
 
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(HomeOsDims.gutter)) {
-        PaperBlock(plate = plate) {
+        PaperBlock(plate = plate, lead = true) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(14.dp),

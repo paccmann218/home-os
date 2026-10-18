@@ -147,7 +147,10 @@ fun StatReadout(
     Row(verticalAlignment = Alignment.Bottom, modifier = modifier) {
         Text(
             text = value,
-            style = if (hero) type.hero else type.readout,
+            // A missing value drops out of hero size as well as out of ink. At 46sp a placeholder
+            // dash is a stroke the width of a thumb sitting in the middle of an empty card, which
+            // reads as something broken rather than as something not yet known.
+            style = if (hero && !missing) type.hero else type.readout,
             color = if (missing) colors.inkMuted.copy(alpha = 0.45f) else colors.ink,
         )
         if (unit != null && !missing) {

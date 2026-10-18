@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,6 +30,7 @@ import com.homeos.bridge.theme.ink
 import com.homeos.bridge.ui.components.Disclosure
 import com.homeos.bridge.ui.components.EvidenceBars
 import com.homeos.bridge.ui.components.PaperBlock
+import com.homeos.bridge.ui.components.ThinkingDots
 import com.homeos.bridge.ui.icons.HomeOsIcons
 
 /**
@@ -66,13 +66,13 @@ fun WhyContent(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            CircularProgressIndicator(color = colors.teal)
+            ThinkingDots()
         }
         return
     }
 
     if (explanation == null) {
-        PaperBlock(plate = Plate.Failure, modifier = modifier) {
+        PaperBlock(plate = Plate.Failure, lead = true, modifier = modifier) {
             Text("Couldn't load the reasoning", style = type.blockTitle, color = colors.ink)
             Text(
                 error ?: "The home could not explain this decision.",
@@ -85,8 +85,9 @@ fun WhyContent(
 
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(HomeOsDims.gutter)) {
 
-        // Layer 1: what happened, in one sentence, always visible.
-        PaperBlock(plate = Plate.Home) {
+        // Layer 1: what happened, in one sentence, always visible. The one plated block in the
+        // sheet, because it is the thing the sheet is about.
+        PaperBlock(plate = Plate.Home, lead = true) {
             Text("WHAT HAPPENED", style = type.micro, color = colors.inkMuted)
             Text(explanation.episode, style = type.blockTitle, color = colors.ink)
             if (explanation.rationale.isNotEmpty()) {
@@ -215,7 +216,10 @@ private fun PrivacySplit(explanation: Explanation, modifier: Modifier = Modifier
             Text("WHAT STAYED PRIVATE", style = type.micro, color = colors.onShellMuted)
         }
 
-        PaperBlock(plate = Plate.Body) {
+        // Plated, where its pair is railed. The asymmetry is the argument: what stayed private
+        // is the claim this product is making, and the anonymous range the home received is the
+        // supporting detail.
+        PaperBlock(plate = Plate.Body, lead = true) {
             Text("Yours alone", style = type.blockTitle, color = colors.ink)
             Text(
                 "In your private graph. No other person's agent can read any of this.",

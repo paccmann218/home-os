@@ -10,13 +10,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.homeos.bridge.data.AppState
 import com.homeos.bridge.data.Decision
@@ -30,15 +33,25 @@ import com.homeos.bridge.theme.ink
 import com.homeos.bridge.ui.components.AblationBanner
 import com.homeos.bridge.ui.components.AppliancePanel
 import com.homeos.bridge.ui.components.Baseline
+import com.homeos.bridge.ui.components.PaperAction
 import com.homeos.bridge.ui.components.PaperBlock
 import com.homeos.bridge.ui.components.PersonAvatar
 import com.homeos.bridge.ui.components.SectionHeader
 import com.homeos.bridge.ui.components.Sparkline
 import com.homeos.bridge.ui.components.StatReadout
 import com.homeos.bridge.ui.components.StatusDot
+import com.homeos.bridge.ui.components.blockMargin
 import com.homeos.bridge.ui.components.readoutValue
 import com.homeos.bridge.ui.icons.HomeOsIcons
 import kotlin.math.roundToInt
+
+/**
+ * How tall a person card is.
+ *
+ * Fixed rather than intrinsic, because these live in a lazy row and a lazy layout cannot answer an
+ * intrinsic measurement - `IntrinsicSize.Min` on a `LazyRow` throws rather than degrading.
+ */
+private val PERSON_CARD = 134.dp
 
 private val SLEEP_HOURS = Regex("""([\d.]+)\s*h sleep""")
 private val DEEP_MINUTES = Regex("""(\d+)\s*min deep""")
@@ -75,8 +88,11 @@ fun HomeScreen(
     val rmssd = state.myBody?.rmssd
     val rmssdBaseline = state.context?.baseline("rmssd")
     // Horizontal insets live on the items, not on the list, so the appliance strip can run
-    // edge to edge while everything else stays on the margin.
-    val gutter = Modifier.padding(horizontal = HomeOsDims.screenMargin)
+    // edge to edge while everything else stays on the margin. Paper blocks get the short end
+    // margin, because each of them reserves the plate offset on its right whether it draws one or
+    // not; glass and headings get the true margin. Both land their visible edge in the same place.
+    val blockGutter = Modifier.blockMargin()
+    val edgeGutter = Modifier.padding(horizontal = HomeOsDims.screenMargin)
 
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
@@ -88,7 +104,7 @@ fun HomeScreen(
     ) {
         state.prompt?.let { prompt ->
             item(key = "prompt") {
-                PaperBlock(modifier = gutter, plate = Plate.Attention) {
+                PaperBlock(modifier = blockGutter, plate = Plate.Attention, lead = true) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(
                             HomeOsIcons.bolt,
@@ -99,35 +115,33 @@ fun HomeScreen(
                         Text("HOMEOS ASKS", style = type.micro, color = colors.inkMuted)
                     }
                     Text(prompt.text, style = type.blockTitle, color = colors.ink)
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 4.dp)) {
-                        listOf("yes", "no").forEach { answer ->
-                            PaperBlock(
-                                modifier = Modifier.weight(1f),
-                                plate = if (answer == "yes") Plate.Good else Plate.None,
-                                onClick = { onAnswerPrompt(answer) },
-                                padding = PaddingValues(vertical = 12.dp),
-                            ) {
-                                Text(
-                                    answer.uppercase(),
-                                    style = type.label,
-                                    color = colors.ink,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                            }
-                        }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.padding(top = 6.dp),
+                    ) {
+                        PaperAction(
+                            label = "Yes",
+                            accent = colors.greenInk,
+                            onClick = { onAnswerPrompt("yes") },
+                            modifier = Modifier.weight(1f),
+                        )
+                        PaperAction(
+                            label = "No",
+                            onClick = { onAnswerPrompt("no") },
+                            modifier = Modifier.weight(1f),
+                        )
                     }
                 }
             }
         }
 
         if (!state.home.graphEnabled) {
-            item(key = "ablation") { AblationBanner(gutter) }
+            item(key = "ablation") { AblationBanner(edgeGutter) }
         }
 
         if (state.offline) {
             item(key = "offline") {
-                PaperBlock(modifier = gutter, plate = Plate.Failure) {
+                PaperBlock(modifier = blockGutter, plate = Plate.Failure, lead = true) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Icon(
                             HomeOsIcons.cloudOff,
@@ -151,8 +165,9 @@ fun HomeScreen(
         // The hero. One number leads the screen, at display size, with its band underneath.
         item(key = "body") {
             PaperBlock(
-                modifier = gutter,
+                modifier = blockGutter,
                 plate = Plate.Body,
+                lead = true,
                 padding = PaddingValues(HomeOsDims.heroPadding),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
@@ -166,6 +181,11 @@ fun HomeScreen(
                     current = liveHr,
                     baseline = hrBaseline?.let { Baseline(it.mean, it.sd) },
                     note = when {
+                        // With no live reading, what is already known about this person is far
+                        // more use than an apology. The baseline is in their graph either way.
+                        liveHr == null && hrBaseline != null ->
+                            "Nothing reporting right now. Usually " +
+                                "${hrBaseline.mean.roundToInt()} bpm for you."
                         liveHr == null -> "No wearable reporting. The watch or ring has to be on."
                         hrBaseline == null -> "Not enough nights yet to know what is usual for you."
                         else -> null
@@ -178,7 +198,7 @@ fun HomeScreen(
         // Unequal widths, equal heights, so the two plates sit on the same line.
         item(key = "night-and-hrv") {
             Row(
-                gutter.height(IntrinsicSize.Min),
+                blockGutter.height(IntrinsicSize.Min),
                 horizontalArrangement = Arrangement.spacedBy(HomeOsDims.gutter),
             ) {
                 val hours = lastSleep?.summary?.let { SLEEP_HOURS.find(it)?.groupValues?.get(1) }
@@ -238,12 +258,12 @@ fun HomeScreen(
             }
         }
 
-        item(key = "room") { RoomBlock(state = state, modifier = gutter) }
+        item(key = "room") { RoomBlock(state = state, modifier = blockGutter) }
 
         item(key = "appliances-header") {
             SectionHeader(
                 title = "Appliances",
-                modifier = gutter,
+                modifier = edgeGutter,
                 trailing = "${state.home.devices.count { it.isOn }} on",
             )
         }
@@ -257,14 +277,14 @@ fun HomeScreen(
 
         state.latestDecision?.let { decision ->
             item(key = "decision") {
-                DecisionBlock(decision = decision, onWhy = { onWhy(decision) }, modifier = gutter)
+                DecisionBlock(decision = decision, onWhy = { onWhy(decision) }, modifier = blockGutter)
             }
         }
 
         item(key = "household-header") {
             SectionHeader(
                 title = "Who's in",
-                modifier = gutter,
+                modifier = edgeGutter,
                 trailing = "${state.home.people.count { it.present }} of ${state.home.people.size} home",
             )
         }
@@ -273,7 +293,6 @@ fun HomeScreen(
                 people = state.home.people,
                 me = state.alias,
                 state = state,
-                modifier = gutter,
             )
         }
     }
@@ -345,7 +364,7 @@ private fun RoomBlock(state: AppState, modifier: Modifier = Modifier) {
 private fun DecisionBlock(decision: Decision, onWhy: () -> Unit, modifier: Modifier = Modifier) {
     val colors = HomeOs.colors
     val type = HomeOs.type
-    PaperBlock(modifier = modifier, plate = Plate.Home, onClick = onWhy) {
+    PaperBlock(modifier = modifier, plate = Plate.Home) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("WHAT THE HOME DID FOR YOU", style = type.micro, color = colors.inkMuted)
             Spacer(Modifier.weight(1f))
@@ -353,26 +372,26 @@ private fun DecisionBlock(decision: Decision, onWhy: () -> Unit, modifier: Modif
         }
         Text(decision.summary, style = type.blockTitle, color = colors.ink)
         if (decision.chose.isNotEmpty()) {
-            Text(decision.chose.joinToString(" · "), style = type.body, color = colors.violetInk)
+            Text(decision.chose.joinToString("  ·  "), style = type.body, color = colors.violetInk)
         }
-        Row(
-            Modifier.fillMaxWidth().padding(top = 2.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text("Why", style = type.label, color = colors.ink)
-            Icon(
-                HomeOsIcons.arrowOutward,
-                contentDescription = null,
-                tint = colors.ink,
-                modifier = Modifier.size(15.dp),
-            )
-        }
+        // An explicit control rather than a whole-block tap. The block carries a sentence worth
+        // reading and a reason worth opening, and those are two different intentions; making the
+        // paragraph itself the button means you cannot read it without nearly leaving it.
+        PaperAction(
+            label = "Why",
+            icon = HomeOsIcons.arrowOutward,
+            onClick = onWhy,
+            modifier = Modifier.padding(top = 4.dp),
+        )
     }
 }
 
 /**
  * The household strip.
+ *
+ * Sideways rather than as a stack of full-width rows, for two reasons. Presence is a glance, not a
+ * reading, so it does not deserve four rows of a phone screen; and a row of faces is the only shape
+ * that makes the household feel like a household instead of a list of accounts.
  *
  * Other people show presence and nothing else. That is not a simplification: their conditions and
  * reasons live in graphs this person's agent genuinely cannot read, so showing them would be a
@@ -387,50 +406,63 @@ private fun HouseholdStrip(
 ) {
     val colors = HomeOs.colors
     val type = HomeOs.type
-    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        people.forEach { person ->
+
+    LazyRow(
+        modifier = modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = HomeOsDims.screenMargin),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        items(people, key = { it.alias }) { person ->
             val body = state.home.body[person.alias]
+            val isMe = person.alias == me
             PaperBlock(
-                plate = if (person.alias == me) Plate.Body else Plate.None,
-                padding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+                modifier = Modifier.width(146.dp).height(PERSON_CARD),
+                plate = if (isMe) Plate.Body else Plate.None,
+                padding = PaddingValues(13.dp),
+                fillHeight = true,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     PersonAvatar(
                         alias = person.alias,
-                        size = 42.dp,
+                        size = 36.dp,
                         present = if (person.isDataset) null else person.present,
                         dim = person.isDataset,
                     )
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            person.alias + if (person.alias == me) " (you)" else "",
-                            style = type.blockTitle,
-                            color = colors.ink,
-                        )
-                        Text(
-                            when {
-                                person.isDataset -> "public dataset · never in the room"
-                                person.present -> "in the bedroom"
-                                else -> "not home"
-                            },
-                            style = type.caption,
-                            color = colors.inkMuted,
-                        )
-                    }
+                    Spacer(Modifier.weight(1f))
                     if (body?.hr != null) {
-                        Column(horizontalAlignment = Alignment.End) {
+                        Row(verticalAlignment = Alignment.Bottom) {
                             Text(
                                 "${body.hr.roundToInt()}",
                                 style = type.readout,
                                 color = Plate.Body.ink(colors),
                             )
-                            Text("bpm", style = type.micro, color = colors.inkMuted)
+                            Text(
+                                " bpm",
+                                style = type.micro,
+                                color = colors.inkMuted,
+                                modifier = Modifier.padding(bottom = 4.dp),
+                            )
                         }
                     }
                 }
+                Spacer(Modifier.weight(1f))
+                Text(
+                    person.alias + if (isMe) " (you)" else "",
+                    style = type.blockTitle,
+                    color = colors.ink,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    when {
+                        person.isDataset -> "public dataset"
+                        person.present -> "in the bedroom"
+                        else -> "not home"
+                    },
+                    style = type.caption,
+                    color = colors.inkMuted,
+                )
             }
         }
     }

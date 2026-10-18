@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Expanded notification content. The guaranteed height is about 252dp, so this stays well inside
+    it: a kicker, the sentence in full, and one line saying where the sentence came from.
+
+    The display serif appears here and not in the collapsed view on purpose. Collapsed, a
+    notification is a glance and Inter is the right voice for it; expanded, it is something you have
+    chosen to read, which is exactly where this app sets Fraunces everywhere else.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/notif_card"
+    android:orientation="horizontal"
+    android:paddingStart="13dp"
+    android:paddingTop="14dp"
+    android:paddingEnd="16dp"
+    android:paddingBottom="14dp">
+
+    <View
+        android:layout_width="3dp"
+        android:layout_height="match_parent"
+        android:layout_marginEnd="13dp"
+        android:minHeight="48dp"
+        android:background="@drawable/notif_rail" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/notif_kicker"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/inter_variable"
+            android:letterSpacing="0.14"
+            android:maxLines="1"
+            android:text="@string/notif_kicker_default"
+            android:textColor="@color/teal"
+            android:textSize="10sp" />
+
+        <TextView
+            android:id="@+id/notif_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:ellipsize="end"
+            android:fontFamily="@font/fraunces_variable"
+            android:lineSpacingExtra="3dp"
+            android:maxLines="7"
+            android:textColor="@color/on_shell"
+            android:textSize="17sp" />
+
+        <TextView
+            android:id="@+id/notif_footer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="9dp"
+            android:fontFamily="@font/inter_variable"
+            android:maxLines="1"
+            android:text="@string/notif_footer"
+            android:textColor="@color/on_shell_muted"
+            android:textSize="11sp" />
+    </LinearLayout>
+</LinearLayout>

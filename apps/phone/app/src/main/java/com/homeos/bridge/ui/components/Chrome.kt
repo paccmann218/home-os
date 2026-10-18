@@ -5,7 +5,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,7 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,7 +31,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -69,24 +68,16 @@ enum class Destination(
 }
 
 /**
- * Icons drawn on the dark shell.
- *
- * Material Symbols has a `GRAD` axis precisely for this, and Google's guidance is grade -25 on dark
- * backgrounds to stop a light stroke blooming against a dark field. This app bakes one icon set
- * (weight 400, grade 0) into source rather than shipping the variable font, so the same perceptual
- * correction is made with tone instead: shell icons never run at full strength.
- */
-@Composable
-private fun shellIconTint(active: Boolean) =
-    if (active) HomeOs.colors.onShell.copy(alpha = 0.94f) else HomeOs.colors.onShellMuted
-
-/**
- * A person's avatar: a deep two-stop gradient disc with a serif monogram and a hard ring.
+ * A person's avatar: a deep two-stop gradient disc with a serif monogram.
  *
  * The gradient is picked by hashing the alias, so a person keeps the same identity on every screen
- * without the backend storing one. The ring is the same 2dp ink as a paper block's border, which is
- * what keeps the avatar in the same design family as everything around it rather than looking like
- * a component borrowed from another app.
+ * without the backend storing one.
+ *
+ * The ring adapts to what the avatar is standing on, and that is not fussiness. On paper the ring
+ * is the same 2dp ink as a block border, which is what keeps the avatar in the same family as
+ * everything around it. On glass that same ring is a near-black line on a dark translucent surface
+ * — invisible as structure and faintly grubby as a mark — so there it becomes a light hairline,
+ * lit from the top like every other edge on that layer.
  */
 @Composable
 fun PersonAvatar(
@@ -95,6 +86,7 @@ fun PersonAvatar(
     size: Dp = 44.dp,
     present: Boolean? = null,
     dim: Boolean = false,
+    onGlass: Boolean = false,
 ) {
     val colors = HomeOs.colors
     val (deep, mid) = avatarGradient(alias)
@@ -116,7 +108,24 @@ fun PersonAvatar(
                 .fillMaxSize()
                 .clip(CircleShape)
                 .background(fill)
-                .border(HomeOsDims.border, colors.border, CircleShape),
+                .then(
+                    if (onGlass) {
+                        Modifier.drawBehind {
+                            drawCircle(
+                                brush = Brush.verticalGradient(
+                                    listOf(
+                                        colors.onShell.copy(alpha = 0.46f),
+                                        colors.onShell.copy(alpha = 0.12f),
+                                    ),
+                                ),
+                                radius = this.size.minDimension / 2f - HomeOsDims.glassBorder.toPx() / 2f,
+                                style = Stroke(HomeOsDims.glassBorder.toPx()),
+                            )
+                        }
+                    } else {
+                        Modifier.border(HomeOsDims.border, colors.border, CircleShape)
+                    },
+                ),
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -131,10 +140,10 @@ fun PersonAvatar(
                     .size(size * 0.30f)
                     .align(Alignment.BottomEnd)
                     .clip(CircleShape)
-                    .background(colors.paper)
+                    .background(if (onGlass) colors.shell else colors.paper)
                     .padding(2.dp)
                     .clip(CircleShape)
-                    .background(if (present) colors.greenInk else colors.inkMuted),
+                    .background(if (present) colors.green else colors.onShellMuted),
             )
         }
     }
@@ -143,7 +152,12 @@ fun PersonAvatar(
 /**
  * The top bar: who you are, and whether the home can hear you.
  *
- * Tap the identity chip to switch person — this is one phone shared by a household, not a
+ * It has no bottom edge. An edge-to-edge bar cannot be lit — it has no corners — so the only thing
+ * available to mark its boundary is a rule across the screen, and a rule across the screen is the
+ * thing that makes chrome look bolted on. Instead the material fades out over its last third, so
+ * content passes under it and disappears rather than being cut off.
+ *
+ * Tap the identity chip to switch person; this is one phone shared by a household, not a
  * single-user device. Long-press it for dev mode, which keeps the console one gesture away without
  * giving it a place in the product's navigation.
  */
@@ -159,7 +173,6 @@ fun HomeOsTopBar(
     val colors = HomeOs.colors
     val type = HomeOs.type
     val statusBars = WindowInsets.statusBars.asPaddingValues()
-    val onShellLine = colors.onShell.copy(alpha = 0.14f)
     val dot by animateColorAsState(
         targetValue = if (linked) colors.green else colors.red,
         animationSpec = Motion.effects(),
@@ -168,19 +181,9 @@ fun HomeOsTopBar(
 
     GlassSurface(
         level = GlassLevel.Chrome,
-        shape = RoundedCornerShape(0.dp),
-        modifier = modifier
-            .fillMaxWidth()
-            // A hairline under the bar. Without an edge, glass over a dark gradient has no visible
-            // boundary and the bar appears to float with content sliding out of nowhere.
-            .drawBehind {
-                drawLine(
-                    color = onShellLine,
-                    start = Offset(0f, size.height),
-                    end = Offset(size.width, size.height),
-                    strokeWidth = 1f,
-                )
-            },
+        shape = RectangleShape,
+        fade = GlassFadeDown,
+        modifier = modifier.fillMaxWidth(),
     ) {
         Row(
             Modifier
@@ -202,15 +205,13 @@ fun HomeOsTopBar(
 
             Row(
                 Modifier
-                    .clip(HomeOsShapes.pill)
-                    .background(colors.onShell.copy(alpha = 0.06f), HomeOsShapes.pill)
-                    .border(1.dp, colors.onShellMuted.copy(alpha = 0.40f), HomeOsShapes.pill)
                     .combinedClickable(
                         onClick = onSwitchPerson,
                         onLongClick = onOpenDev,
                         onLongClickLabel = "Open dev mode",
                     )
-                    .padding(start = 5.dp, end = 10.dp, top = 5.dp, bottom = 5.dp)
+                    .frostedSurface(HomeOsShapes.pill)
+                    .padding(start = 5.dp, end = 11.dp, top = 5.dp, bottom = 5.dp)
                     .semantics {
                         contentDescription =
                             "Acting as $alias. ${if (linked) "Connected" else "Not connected"}. " +
@@ -219,7 +220,7 @@ fun HomeOsTopBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                PersonAvatar(alias = alias, size = 28.dp)
+                PersonAvatar(alias = alias, size = 28.dp, onGlass = true)
                 Text(alias.ifEmpty { "no person" }, style = type.label, color = colors.onShell)
                 StatusDot(on = linked, onColor = dot)
                 Icon(
@@ -234,12 +235,12 @@ fun HomeOsTopBar(
 }
 
 /**
- * The dock: a floating glass pill rather than a full-width bar.
+ * The dock: a floating glass pill, inset from all three edges so content scrolls visibly beneath
+ * it — which is the point of having glass at all. A bar welded to the bottom of the screen has
+ * nothing to refract and may as well be opaque.
  *
- * Inset from all three edges so the content scrolls visibly beneath it, which is the point of
- * having glass at all — a bar welded to the bottom of the screen has nothing to refract and may as
- * well be opaque. It takes the hard 2dp outline, because unlike the top bar it is an object sitting
- * on top of the page rather than chrome trying to disappear.
+ * Selection is one lens that slides, not an outline that appears on whichever item is current. The
+ * lens is the only moving part; the icons just fill.
  */
 @Composable
 fun HomeOsDock(
@@ -249,6 +250,11 @@ fun HomeOsDock(
 ) {
     val colors = HomeOs.colors
     val navBars = WindowInsets.navigationBars.asPaddingValues()
+    val position by animateFloatAsState(
+        targetValue = Destination.entries.indexOf(current).toFloat(),
+        animationSpec = Motion.spatialDefault(),
+        label = "dockLens",
+    )
 
     Box(
         modifier
@@ -268,7 +274,14 @@ fun HomeOsDock(
                 Modifier
                     .fillMaxWidth()
                     .height(ShellDims.dock)
-                    .padding(horizontal = 6.dp),
+                    .slidingLens(
+                        position = position,
+                        count = Destination.entries.size,
+                        accent = colors.teal,
+                        light = colors.onShell,
+                        shade = colors.shellSunk,
+                        inset = 7.dp,
+                    ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Destination.entries.forEach { destination ->
@@ -292,19 +305,21 @@ private fun DockItem(
     modifier: Modifier = Modifier,
 ) {
     val colors = HomeOs.colors
-    val emphasis by animateFloatAsState(
-        targetValue = if (selected) 1f else 0f,
+    val iconTint by animateColorAsState(
+        targetValue = if (selected) colors.onShell else colors.onShellMuted,
         animationSpec = Motion.effects(),
-        label = "dockEmphasis",
+        label = "dockIcon",
+    )
+    val labelTint by animateColorAsState(
+        targetValue = if (selected) colors.onShell else colors.onShellMuted,
+        animationSpec = Motion.effects(),
+        label = "dockLabel",
     )
 
     Box(
         modifier
             .height(HomeOsDims.minTouch)
-            .clip(HomeOsShapes.pill)
-            .background(colors.teal.copy(alpha = 0.16f * emphasis), HomeOsShapes.pill)
-            .clickable(onClick = onSelect)
-            .semantics { contentDescription = destination.label },
+            .pressable(onClick = onSelect, label = destination.label),
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -314,15 +329,11 @@ private fun DockItem(
             Icon(
                 imageVector = if (selected) destination.iconSelected else destination.icon,
                 contentDescription = null,
-                tint = if (selected) colors.teal else shellIconTint(active = false),
+                tint = iconTint,
                 modifier = Modifier.size(21.dp),
             )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                destination.label,
-                style = HomeOs.type.micro,
-                color = if (selected) colors.onShell else colors.onShellMuted,
-            )
+            Spacer(Modifier.height(3.dp))
+            Text(destination.label, style = HomeOs.type.micro, color = labelTint)
         }
     }
 }
@@ -334,9 +345,8 @@ fun AblationBanner(modifier: Modifier = Modifier) {
     Row(
         modifier
             .fillMaxWidth()
-            .background(colors.red.copy(alpha = 0.16f), HomeOsShapes.chip)
-            .border(1.dp, colors.red.copy(alpha = 0.5f), HomeOsShapes.chip)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .frostedSurface(HomeOsShapes.block, selection = 1f, accent = colors.red)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {

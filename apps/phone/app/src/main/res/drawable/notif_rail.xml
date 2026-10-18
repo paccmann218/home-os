@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The accent rail, exactly as a paper block carries one in the app: a hue down the left edge
+    instead of a coloured background. Teal into violet, which is the app saying *your body* and
+    *the home* in one mark, because a notification from HomeOS is almost always about both.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="2dp" />
+    <gradient
+        android:angle="270"
+        android:startColor="#FFB6A2F3"
+        android:endColor="#FF60D3CD"
+        android:type="linear" />
+</shape>

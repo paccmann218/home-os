@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        The window, before Compose has drawn anything.
+
+        windowBackground is the colour of the cold start, and leaving it at the platform default is
+        why so many dark apps flash grey for a couple of frames on launch. The splash attributes are
+        API 31+, which this app already requires, so a branded start costs three lines rather than a
+        dependency.
+    -->
+    <style name="Theme.HomeOS" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/shell</item>
+        <item name="android:colorBackground">@color/shell</item>
+        <item name="android:statusBarColor">@color/transparent</item>
+        <item name="android:navigationBarColor">@color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowSplashScreenBackground">@color/shell</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/transparent</item>
+    </style>
+</resources>

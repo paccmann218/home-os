@@ -3,8 +3,11 @@ package com.homeos.bridge
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Intent
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
+import android.widget.RemoteViews
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -56,9 +59,11 @@ import com.homeos.bridge.ui.ask.AskScreen
 import com.homeos.bridge.ui.ask.Turn
 import com.homeos.bridge.ui.checkin.CheckInScreen
 import com.homeos.bridge.ui.components.Ambience
+import com.homeos.bridge.ui.components.BannerMessage
 import com.homeos.bridge.ui.components.ApplianceCatalogue
 import com.homeos.bridge.ui.components.Destination
 import com.homeos.bridge.ui.components.DeviceDetail
+import com.homeos.bridge.ui.components.HomeOsBanner
 import com.homeos.bridge.ui.components.HomeOsDock
 import com.homeos.bridge.ui.components.HomeOsSheet
 import com.homeos.bridge.ui.components.HomeOsTopBar
@@ -71,6 +76,8 @@ import com.homeos.bridge.ui.memory.MemoryData
 import com.homeos.bridge.ui.memory.MemoryScreen
 import com.homeos.bridge.ui.why.WhyContent
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
@@ -87,6 +94,16 @@ class MainActivity : ComponentActivity() {
     private lateinit var prefs: Prefs
     private lateinit var repository: HomeOsRepository
     private var tts: TextToSpeech? = null
+
+    /**
+     * What the home has just said, when the app itself is the thing being looked at.
+     *
+     * A notification posted over the screen that already shows the news is noise, so the two
+     * routes are mutually exclusive: in the foreground the home speaks on glass inside the app,
+     * and only when nobody is looking does it reach for the tray.
+     */
+    private val banner = MutableStateFlow<BannerMessage?>(null)
+    private var foreground = false
 
     private val healthPermissions = registerForActivityResult(
         PermissionController.createRequestPermissionResultContract(),
@@ -109,7 +126,17 @@ class MainActivity : ComponentActivity() {
             if (status == TextToSpeech.SUCCESS) tts?.language = Locale("en", "IN")
         }
         getSystemService(NotificationManager::class.java).createNotificationChannel(
-            NotificationChannel("homeos", "HomeOS", NotificationManager.IMPORTANCE_HIGH),
+            NotificationChannel(
+                CHANNEL,
+                getString(R.string.notif_channel_name),
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply {
+                description = getString(R.string.notif_channel_description)
+                enableLights(true)
+                lightColor = ACCENT
+                enableVibration(true)
+                setShowBadge(true)
+            },
         )
         notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
 
@@ -127,9 +154,9 @@ class MainActivity : ComponentActivity() {
                 when (event) {
                     is DeviceEvent.Say -> {
                         tts?.speak(event.text, TextToSpeech.QUEUE_FLUSH, null, "homeos")
-                        notify(event.text)
+                        announce("THE HOME SAYS", event.text)
                     }
-                    is DeviceEvent.Prompt -> notify(event.text)
+                    is DeviceEvent.Prompt -> announce("HOMEOS ASKS", event.text)
                     else -> Unit
                 }
             }
@@ -144,19 +171,74 @@ class MainActivity : ComponentActivity() {
                     serverUrl = { prefs.url },
                     onRequestHealthPermissions = { healthPermissions.launch(HealthSync.PERMISSIONS) },
                     onSync = ::runSync,
+                    banner = banner,
+                    onDismissBanner = { banner.value = null },
                 )
             }
         }
     }
 
-    private fun notify(text: String) {
-        val notification = NotificationCompat.Builder(this, "homeos")
-            .setSmallIcon(android.R.drawable.ic_menu_compass)
-            .setContentTitle("HomeOS")
+    override fun onResume() {
+        super.onResume()
+        foreground = true
+    }
+
+    override fun onPause() {
+        foreground = false
+        super.onPause()
+    }
+
+    /** One voice, two routes: glass inside the app while it is open, the tray while it is not. */
+    private fun announce(kicker: String, text: String) {
+        if (text.isBlank()) return
+        if (foreground) {
+            banner.value = BannerMessage(kicker, text, System.currentTimeMillis())
+        } else {
+            notify(kicker, text)
+        }
+    }
+
+    /**
+     * A notification built out of the same surface the app is built out of.
+     *
+     * Targeting API 31+ means the platform wraps whatever is supplied in its own header and chrome,
+     * so `DecoratedCustomViewStyle` is not a compromise here, it is the supported path: the system
+     * keeps the icon, the app name and the timestamp, and the content area becomes a HomeOS card
+     * with its rail, its rim and its lit top edge. Collapsed and expanded differ in more than
+     * length - collapsed is a glance and is set in Inter, expanded is something somebody chose to
+     * read and is set in the display serif, which is the same rule the app follows everywhere.
+     *
+     * The plain title and text are still set, because wearables, Android Auto and accessibility
+     * services read those rather than the custom views.
+     */
+    private fun notify(kicker: String, text: String) {
+        val open = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+        fun card(layout: Int) = RemoteViews(packageName, layout).apply {
+            setTextViewText(R.id.notif_kicker, kicker)
+            setTextViewText(R.id.notif_text, text)
+        }
+
+        val notification = NotificationCompat.Builder(this, CHANNEL)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setColor(ACCENT)
+            .setContentTitle(getString(R.string.app_name))
             .setContentText(text)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+            .setCustomContentView(card(R.layout.notification_homeos))
+            .setCustomBigContentView(card(R.layout.notification_homeos_big))
+            .setContentIntent(open)
+            .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setAutoCancel(true)
             .build()
+
         runCatching {
             getSystemService(NotificationManager::class.java).notify(text.hashCode(), notification)
         }
@@ -179,6 +261,13 @@ class MainActivity : ComponentActivity() {
         tts?.shutdown()
         super.onDestroy()
     }
+
+    private companion object {
+        const val CHANNEL = "homeos"
+
+        /** Tints the notification header and the channel light. The same teal as the app. */
+        const val ACCENT = 0xFF60D3CD.toInt()
+    }
 }
 
 /** Which overlay, if any, is on top of the tabs. */
@@ -192,8 +281,11 @@ private fun BridgeApp(
     serverUrl: () -> String,
     onRequestHealthPermissions: () -> Unit,
     onSync: suspend (Long) -> String,
+    banner: StateFlow<BannerMessage?>,
+    onDismissBanner: () -> Unit,
 ) {
     val state by repository.state.collectAsStateWithLifecycle()
+    val announcement by banner.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
     var tab by remember { mutableStateOf(Destination.Home) }
@@ -300,6 +392,12 @@ private fun BridgeApp(
             }
         },
         overlay = {
+            HomeOsBanner(
+                message = announcement,
+                onDismiss = onDismissBanner,
+                onOpen = { tab = Destination.Home },
+            )
+
             HomeOsSheet(
                 visible = overlay == Overlay.Why,
                 onDismiss = { overlay = Overlay.None },

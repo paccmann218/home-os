@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">HomeOS Bridge</string>
+    <string name="app_name">HomeOS</string>
+    <string name="notif_channel_name">The home speaking</string>
+    <string name="notif_channel_description">What the home did for you, and the questions it asks.</string>
+    <string name="notif_kicker_default">HOMEOS</string>
+    <string name="notif_footer">Reasoned from your graph</string>
 </resources>

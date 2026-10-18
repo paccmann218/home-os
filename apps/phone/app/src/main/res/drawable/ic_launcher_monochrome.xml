@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Themed icons: one colour, so the system can tint the mark to the wallpaper palette. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:pathData="M54,54 L54,32" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.6" android:strokeLineCap="round" />
+    <path android:pathData="M54,54 L73.05,65" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.6" android:strokeLineCap="round" />
+    <path android:pathData="M54,54 L34.95,65" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.6" android:strokeLineCap="round" />
+    <path android:pathData="M44.5,54a9.5,9.5 0 1,0 19,0a9.5,9.5 0 1,0 -19,0z" android:fillColor="#FFFFFFFF" />
+    <path android:pathData="M48.5,32a5.5,5.5 0 1,0 11,0a5.5,5.5 0 1,0 -11,0z" android:fillColor="#FFFFFFFF" />
+    <path android:pathData="M67.55,65a5.5,5.5 0 1,0 11,0a5.5,5.5 0 1,0 -11,0z" android:fillColor="#FFFFFFFF" />
+    <path android:pathData="M29.45,65a5.5,5.5 0 1,0 11,0a5.5,5.5 0 1,0 -11,0z" android:fillColor="#FFFFFFFF" />
+</vector>

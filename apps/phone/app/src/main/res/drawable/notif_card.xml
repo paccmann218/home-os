@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The notification card: the app's own surface, inside the system template.
+
+    Apps targeting API 31+ cannot draw a fully custom notification — the platform wraps whatever you
+    supply in its own header and chrome — so the honest ambition is not to replace the notification
+    but to put one of this app's surfaces inside it. That is what this is: the shell gradient, a
+    hairline rim, and a lit top edge, built the only way a RemoteViews background can be built.
+
+    A drawable cannot stroke with a gradient, so the directional light is a second layer instead: a
+    1dp bright line across the top, inset far enough to clear the corner radius. It is the same
+    trick the Compose glass uses, done with the tools available here.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="18dp" />
+            <gradient
+                android:angle="270"
+                android:startColor="#FF172123"
+                android:endColor="#FF0A1112"
+                android:type="linear" />
+            <stroke android:width="1dp" android:color="#33E2EAEA" />
+        </shape>
+    </item>
+    <item
+        android:gravity="top"
+        android:height="1dp"
+        android:left="22dp"
+        android:right="22dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#5CE2EAEA" />
+        </shape>
+    </item>
+</layer-list>

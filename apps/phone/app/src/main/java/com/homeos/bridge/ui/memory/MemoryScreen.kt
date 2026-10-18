@@ -2,7 +2,6 @@ package com.homeos.bridge.ui.memory
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +25,10 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.homeos.bridge.data.BeliefChange
@@ -41,9 +44,11 @@ import com.homeos.bridge.theme.HomeOsShapes
 import com.homeos.bridge.theme.Plate
 import com.homeos.bridge.ui.components.EvidenceBars
 import com.homeos.bridge.ui.components.GRAPH_FAMILIES
+import com.homeos.bridge.ui.components.GlassSegmented
 import com.homeos.bridge.ui.components.GraphView
 import com.homeos.bridge.ui.components.PaperBlock
 import com.homeos.bridge.ui.components.SectionHeader
+import com.homeos.bridge.ui.components.Segment
 import com.homeos.bridge.ui.components.StatusDot
 import com.homeos.bridge.ui.icons.HomeOsIcons
 import java.time.Instant
@@ -92,7 +97,7 @@ fun MemoryScreen(
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(
             start = HomeOsDims.screenMargin,
-            end = HomeOsDims.screenMargin,
+            end = HomeOsDims.screenMargin - HomeOsDims.plateOffset,
             top = contentPadding.calculateTopPadding() + 12.dp,
             bottom = contentPadding.calculateBottomPadding(),
         ),
@@ -260,26 +265,57 @@ private fun GraphPanel(
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         // Two graphs, one switch. Putting them side by side is the clearest statement the product
         // can make: your body graph and the shared home graph are different objects.
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .clip(HomeOsShapes.pill)
-                .background(colors.onShell.copy(alpha = 0.07f))
-                .border(1.dp, colors.onShellMuted.copy(alpha = 0.30f), HomeOsShapes.pill)
-                .padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            GraphTab("body:$alias", "private", !showingHome, Modifier.weight(1f)) { onSelectGraph(alias) }
-            GraphTab("home:flat1", "shared", showingHome, Modifier.weight(1f)) { onSelectGraph("home") }
-        }
+        GlassSegmented(
+            segments = listOf(
+                Segment(label = "body:$alias", sub = "private", mono = true),
+                Segment(label = "home:flat1", sub = "shared", mono = true),
+            ),
+            selected = if (showingHome) 1 else 0,
+            onSelect = { index -> onSelectGraph(if (index == 1) "home" else alias) },
+        )
 
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(360.dp)
+                .height(380.dp)
+                .shadow(
+                    elevation = 16.dp,
+                    shape = HomeOsShapes.block,
+                    clip = false,
+                    ambientColor = Color.Black,
+                    spotColor = Color.Black,
+                )
                 .clip(HomeOsShapes.block)
                 .background(colors.shellSunk)
-                .border(HomeOsDims.border, colors.onShell.copy(alpha = 0.55f), HomeOsShapes.block),
+                // A lens rather than a box. The vignette pulls the eye to the middle of the graph
+                // and keeps the corners from reading as four empty right angles, and the sheen is
+                // the same top-lit edge every other surface in the app carries, so the viewport
+                // belongs to the design instead of being a hole cut in it.
+                .drawBehind {
+                    drawRect(
+                        Brush.radialGradient(
+                            0.45f to Color.Transparent,
+                            1.00f to colors.shell.copy(alpha = 0.85f),
+                            center = Offset(size.width / 2f, size.height * 0.46f),
+                            radius = size.maxDimension * 0.72f,
+                        ),
+                    )
+                    drawRect(
+                        Brush.verticalGradient(
+                            0.00f to colors.onShell.copy(alpha = 0.05f),
+                            0.30f to Color.Transparent,
+                        ),
+                    )
+                }
+                .border(
+                    HomeOsDims.glassBorder,
+                    Brush.linearGradient(
+                        0.00f to colors.onShell.copy(alpha = 0.32f),
+                        0.45f to colors.onShell.copy(alpha = 0.14f),
+                        1.00f to colors.onShell.copy(alpha = 0.07f),
+                    ),
+                    HomeOsShapes.block,
+                ),
             contentAlignment = Alignment.Center,
         ) {
             when {
@@ -321,36 +357,6 @@ private fun GraphPanel(
         }
 
         GraphLegend()
-    }
-}
-
-@Composable
-private fun GraphTab(
-    label: String,
-    sub: String,
-    selected: Boolean,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
-    val colors = HomeOs.colors
-    Column(
-        modifier
-            .clip(HomeOsShapes.pill)
-            .background(if (selected) colors.teal.copy(alpha = 0.18f) else Color.Transparent)
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            label,
-            style = HomeOs.type.monoMicro,
-            color = if (selected) colors.teal else colors.onShellMuted,
-        )
-        Text(
-            sub,
-            style = HomeOs.type.micro,
-            color = if (selected) colors.onShell else colors.onShellMuted,
-        )
     }
 }
 
