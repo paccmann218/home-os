@@ -55,13 +55,17 @@ fun Viewport(
     val colors = HomeOs.colors
     val type = HomeOs.type
 
-    Box(modifier.fillMaxWidth().height(height + HomeOsDims.plateOffset)) {
-        Box(
-            Modifier
-                .matchParentSize()
-                .padding(start = HomeOsDims.plateOffset, top = HomeOsDims.plateOffset)
-                .background(colors.plateShadow, HomeOsShapes.block),
-        )
+    val onGlass = LocalOnGlass.current && HomeOs.glass
+
+    Box(modifier.fillMaxWidth().height(height + if (onGlass) 0.dp else HomeOsDims.plateOffset)) {
+        if (!onGlass) {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .padding(start = HomeOsDims.plateOffset, top = HomeOsDims.plateOffset)
+                    .background(colors.plateShadow, HomeOsShapes.block),
+            )
+        }
     Box(
         Modifier
             .fillMaxWidth()
@@ -101,10 +105,28 @@ fun Viewport(
                     )
                 }
             }
-            // The window onto the 3D views is a block like every other: ink border, hard offset.
-            // It is the only dark surface in the app, which is exactly why it needs the same frame
-            // as everything around it.
-            .border(HomeOsDims.border, colors.border, HomeOsShapes.block),
+            // The window onto the 3D views is framed like every other surface here.
+            //
+            // On glass that is a lit edge rather than an ink one, and the direction matters more
+            // here than anywhere else: this is the only opening in the interface, so the rim has
+            // to read as the near edge of an aperture catching light, not as a line drawn round a
+            // picture. Specular at the top, ink at the foot, exactly as a pane.
+            .then(
+                if (onGlass) {
+                    Modifier.border(
+                        HomeOsDims.glassEdge,
+                        Brush.verticalGradient(
+                            0.00f to colors.specular.copy(alpha = 0.88f),
+                            0.24f to colors.specular.copy(alpha = 0.20f),
+                            0.72f to Color.Transparent,
+                            1.00f to colors.ink.copy(alpha = 0.34f),
+                        ),
+                        HomeOsShapes.block,
+                    )
+                } else {
+                    Modifier.border(HomeOsDims.border, colors.border, HomeOsShapes.block)
+                },
+            ),
         contentAlignment = Alignment.Center,
     ) {
         content()

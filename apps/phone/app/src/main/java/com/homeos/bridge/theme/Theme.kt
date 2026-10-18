@@ -8,6 +8,7 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import com.homeos.bridge.ui.components.LocalOnGlass
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -140,6 +141,11 @@ fun HomeOsTheme(content: @Composable () -> Unit) {
         LocalHomeOsType provides HomeOsType,
         LocalReducedMotion provides reducedMotion,
         LocalGlassEnabled provides (contrast <= 0f),
+        // Glass everywhere, not only in the modals. It was scoped to sheets first because that is
+        // where the hard offset was actively wrong; it turned out the answer was right for the
+        // field too. `PaperBlock` still falls back to opaque paper when the system asks for more
+        // contrast, which is the one case where translucency is the wrong answer at any price.
+        LocalOnGlass provides true,
     ) {
         MaterialTheme(
             colorScheme = scheme,

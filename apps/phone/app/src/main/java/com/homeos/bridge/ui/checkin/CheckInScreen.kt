@@ -25,6 +25,7 @@ import com.homeos.bridge.theme.HomeOsDims
 import com.homeos.bridge.theme.Plate
 import com.homeos.bridge.theme.color
 import com.homeos.bridge.theme.ink
+import com.homeos.bridge.ui.components.blockEndMargin
 import com.homeos.bridge.ui.components.GlassChip
 import com.homeos.bridge.ui.components.PaperBlock
 import com.homeos.bridge.ui.components.SectionHeader
@@ -116,7 +117,7 @@ fun CheckInScreen(
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(
             start = HomeOsDims.screenMargin,
-            end = HomeOsDims.screenMargin - HomeOsDims.plateOffset,
+            end = blockEndMargin(),
             top = contentPadding.calculateTopPadding() + 12.dp,
             bottom = contentPadding.calculateBottomPadding() + 24.dp,
         ),

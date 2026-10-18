@@ -42,6 +42,7 @@ import com.homeos.bridge.theme.HomeOs
 import com.homeos.bridge.theme.HomeOsDims
 import com.homeos.bridge.theme.HomeOsShapes
 import com.homeos.bridge.theme.Plate
+import com.homeos.bridge.ui.components.blockEndMargin
 import com.homeos.bridge.ui.components.EvidenceBars
 import com.homeos.bridge.ui.components.GRAPH_FAMILIES
 import com.homeos.bridge.ui.components.GlassSegmented
@@ -97,7 +98,7 @@ fun MemoryScreen(
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(
             start = HomeOsDims.screenMargin,
-            end = HomeOsDims.screenMargin - HomeOsDims.plateOffset,
+            end = blockEndMargin(),
             top = contentPadding.calculateTopPadding() + 12.dp,
             bottom = contentPadding.calculateBottomPadding(),
         ),
