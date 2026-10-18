@@ -152,7 +152,7 @@ class ContrastTest {
         // composite over the worst cases and require the floor in all of them. The glass tints
         // toward cream now, so the text on it is ink rather than the near-white it used to be.
         listOf(
-            "control" to 0.58, "chrome" to 0.55, "dock" to 0.58, "sheet" to 0.72,
+            "control" to 0.58, "chrome" to 0.55, "dock" to 0.58, "sheet" to 0.60,
         ).forEach { (name, alpha) ->
             listOf(
                 "the field" to c.shell,
@@ -161,6 +161,24 @@ class ContrastTest {
             ).forEach { (bdName, backdrop) ->
                 val glass = over(c.shellRaised, alpha, backdrop)
                 assertContrast("ink on $name glass over $bdName", c.ink, glass, 4.5)
+            }
+        }
+    }
+
+    @Test
+    fun `a pane inside a sheet is still legible, over the worst backdrop there is`() {
+        // The modals are glass all the way down now: a translucent pane on a translucent sheet on
+        // whatever the user happened to be looking at. Two alphas multiply, which is exactly the
+        // kind of thing that is fine on the screen it was designed against and fails on the one
+        // dark one — so it is composited here over black, which is the worst this app can produce
+        // (the graph viewport), and required to clear AA at the pane's darkest point.
+        val sheetAlpha = 0.60
+        listOf("foot of a pane" to 0.36, "head of a pane" to 0.54).forEach { (name, paneAlpha) ->
+            listOf("the field" to c.shell, "black" to Color.Black).forEach { (bdName, backdrop) ->
+                val sheet = over(c.shellRaised, sheetAlpha, backdrop)
+                val pane = over(c.paper, paneAlpha, sheet)
+                assertContrast("ink at the $name over $bdName", c.ink, pane, 4.5)
+                assertContrast("muted ink at the $name over $bdName", c.inkMuted, pane, 4.5)
             }
         }
     }

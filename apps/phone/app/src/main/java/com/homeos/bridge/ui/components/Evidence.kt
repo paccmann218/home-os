@@ -34,6 +34,7 @@ fun EvidenceBars(
 ) {
     val colors = HomeOs.colors
     val type = HomeOs.type
+    val well = wellFill()
     if (rows.isEmpty()) {
         Text(
             "Nothing measured yet. Evidence appears once the home has tried something and seen how it went.",
@@ -58,7 +59,7 @@ fun EvidenceBars(
                 }
                 Canvas(Modifier.fillMaxWidth().height(10.dp)) {
                     val radius = CornerRadius(3.dp.toPx())
-                    drawRoundRect(color = colors.paperSunk, size = size, cornerRadius = radius)
+                    drawRoundRect(color = well, size = size, cornerRadius = radius)
                     val width = (row.mean / peak).coerceIn(0f, 1f) * size.width
                     if (width <= 0f) return@Canvas
                     // The whole measured effect, in the pale tone.

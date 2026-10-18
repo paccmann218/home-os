@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
@@ -82,6 +83,7 @@ fun HomeOsBanner(
             enter = slideInVertically(tween(360)) { -it } + fadeIn(tween(220)),
             exit = slideOutVertically(tween(240)) { -it } + fadeOut(tween(180)),
         ) {
+            CompositionLocalProvider(LocalOnGlass provides true) {
             GlassSurface(
                 level = GlassLevel.Dock,
                 shape = HomeOsShapes.block,
@@ -133,6 +135,7 @@ fun HomeOsBanner(
                         )
                     }
                 }
+            }
             }
         }
     }

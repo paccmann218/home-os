@@ -88,7 +88,7 @@ fun PersonAvatar(
     size: Dp = 44.dp,
     present: Boolean? = null,
     dim: Boolean = false,
-    onGlass: Boolean = false,
+    onGlass: Boolean = LocalOnGlass.current,
 ) {
     val colors = HomeOs.colors
     val (deep, mid) = avatarGradient(alias)
@@ -112,16 +112,19 @@ fun PersonAvatar(
                 .background(fill)
                 .then(
                     if (onGlass) {
+                        // Lit rather than outlined: specular at the top, ink at the foot, the
+                        // same edge every other piece of glass in the app carries. A hard ink ring
+                        // around four avatars was the last printed thing left in a glass sheet.
                         Modifier.drawBehind {
                             drawCircle(
                                 brush = Brush.verticalGradient(
                                     listOf(
-                                        colors.onShell.copy(alpha = 0.46f),
-                                        colors.onShell.copy(alpha = 0.12f),
+                                        colors.specular.copy(alpha = 0.80f),
+                                        colors.ink.copy(alpha = 0.30f),
                                     ),
                                 ),
-                                radius = this.size.minDimension / 2f - HomeOsDims.glassBorder.toPx() / 2f,
-                                style = Stroke(HomeOsDims.glassBorder.toPx()),
+                                radius = this.size.minDimension / 2f - HomeOsDims.glassEdge.toPx() / 2f,
+                                style = Stroke(HomeOsDims.glassEdge.toPx()),
                             )
                         }
                     } else {

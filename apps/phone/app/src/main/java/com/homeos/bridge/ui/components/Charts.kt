@@ -205,11 +205,12 @@ fun SleepStageBar(
     modifier: Modifier = Modifier,
 ) {
     val colors = HomeOs.colors
+    val well = wellFill()
     val total = segments.sumOf { it.minutes.toDouble() }.toFloat()
 
     Canvas(modifier.fillMaxWidth().height(28.dp)) {
         val radius = CornerRadius(5.dp.toPx())
-        drawRoundRect(color = colors.paperSunk, size = size, cornerRadius = radius)
+        drawRoundRect(color = well, size = size, cornerRadius = radius)
         if (total <= 0f) return@Canvas
 
         val gap = 1.dp.toPx()

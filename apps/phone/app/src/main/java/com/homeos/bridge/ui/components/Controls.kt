@@ -320,6 +320,8 @@ fun GlassIconButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     filled: Boolean = false,
+    /** True when this key sits on another piece of glass. See `frostedSurface`. */
+    onGlass: Boolean = LocalOnGlass.current,
     accent: Color = HomeOs.colors.teal,
     diameter: Dp = 44.dp,
 ) {
@@ -335,7 +337,7 @@ fun GlassIconButton(
         modifier
             .size(diameter)
             .pressable(onClick = onClick, enabled = enabled, label = contentDescription)
-            .frostedSurface(HomeOsShapes.pill, selection = fill, accent = accent)
+            .frostedSurface(HomeOsShapes.pill, selection = fill, accent = accent, hard = !onGlass)
             .then(
                 if (active) {
                     Modifier.drawBehind {
