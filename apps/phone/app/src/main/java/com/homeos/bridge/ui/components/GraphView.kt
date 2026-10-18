@@ -440,7 +440,7 @@ fun GraphView(
                 drawCircle(color.copy(alpha = 0.10f + 0.12f * near), radius * 2.3f, Offset(px[i], py[i]))
                 drawCircle(color.copy(alpha = 0.35f + 0.6f * near), radius, Offset(px[i], py[i]))
                 drawCircle(
-                    color = colors.shell.copy(alpha = 0.55f * near),
+                    color = colors.shellSunk.copy(alpha = 0.55f * near),
                     radius = radius * 0.42f,
                     center = Offset(px[i], py[i]),
                 )
@@ -502,7 +502,7 @@ fun GraphView(
                     val ox = (px[i] + 14f).coerceAtMost(size.width - w - 8f)
                     val oy = (py[i] + 12f).coerceAtMost(size.height - 34f)
                     drawRoundRect(
-                        color = colors.shell.copy(alpha = 0.88f),
+                        color = colors.shellSunk.copy(alpha = 0.88f),
                         topLeft = Offset(ox - 6f, oy - 4f),
                         size = androidx.compose.ui.geometry.Size(w + 12f, measured.size.height + 8f),
                         cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f),

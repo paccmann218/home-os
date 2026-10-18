@@ -295,7 +295,7 @@ private fun GraphPanel(
                     drawRect(
                         Brush.radialGradient(
                             0.45f to Color.Transparent,
-                            1.00f to colors.shell.copy(alpha = 0.85f),
+                            1.00f to colors.shellSunk.copy(alpha = 0.85f),
                             center = Offset(size.width / 2f, size.height * 0.46f),
                             radius = size.maxDimension * 0.72f,
                         ),

@@ -132,7 +132,8 @@ fun RoomView(
         @Suppress("UNUSED_EXPRESSION")
         frame
 
-        drawScene(ready, sim, scratch, selected, colors.shell)
+        // Far geometry recedes into the stage it is standing on, not into black.
+        drawScene(ready, sim, scratch, selected, colors.well)
     }
 }
 

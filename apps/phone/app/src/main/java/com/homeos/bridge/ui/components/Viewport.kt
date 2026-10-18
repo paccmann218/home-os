@@ -40,49 +40,67 @@ fun Viewport(
     height: Dp = 300.dp,
     hint: String? = null,
     trailing: String? = null,
+    /**
+     * Whether this window is a lit screen or a daylit stage.
+     *
+     * The two 3D views want opposite things and it is worth saying why rather than picking one.
+     * The graph is a network of glowing nodes and needs a dark field to glow against — it is a
+     * screen. The house is a physical model of a room, and a physical model on a black void looks
+     * like it is floating in space; it wants daylight. So the house passes `dark = false` and gets
+     * a deeper tone of the field, which keeps it unmistakably part of this app.
+     */
+    dark: Boolean = true,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val colors = HomeOs.colors
     val type = HomeOs.type
 
+    Box(modifier.fillMaxWidth().height(height + HomeOsDims.plateOffset)) {
+        Box(
+            Modifier
+                .matchParentSize()
+                .padding(start = HomeOsDims.plateOffset, top = HomeOsDims.plateOffset)
+                .background(colors.plateShadow, HomeOsShapes.block),
+        )
     Box(
-        modifier
+        Modifier
             .fillMaxWidth()
             .height(height)
-            .shadow(
-                elevation = 16.dp,
-                shape = HomeOsShapes.block,
-                clip = false,
-                ambientColor = Color.Black,
-                spotColor = Color.Black,
-            )
             .clip(HomeOsShapes.block)
-            .background(colors.shellSunk)
+            .background(if (dark) colors.shellSunk else colors.well)
             .drawBehind {
-                drawRect(
-                    Brush.radialGradient(
-                        0.45f to Color.Transparent,
-                        1.00f to colors.shell.copy(alpha = 0.85f),
-                        center = Offset(size.width / 2f, size.height * 0.46f),
-                        radius = size.maxDimension * 0.72f,
-                    ),
-                )
-                drawRect(
-                    Brush.verticalGradient(
-                        0.00f to colors.onShell.copy(alpha = 0.05f),
-                        0.30f to Color.Transparent,
-                    ),
-                )
+                // A light sky at the top falling to the stage colour, so a model standing in it
+                // has somewhere to stand; on the dark variant the same gradient reads as a
+                // vignette pulling the eye to the middle of the network.
+                if (dark) {
+                    drawRect(
+                        Brush.radialGradient(
+                            0.45f to Color.Transparent,
+                            1.00f to colors.shellSunk.copy(alpha = 0.85f),
+                            center = Offset(size.width / 2f, size.height * 0.46f),
+                            radius = size.maxDimension * 0.72f,
+                        ),
+                    )
+                    drawRect(
+                        Brush.verticalGradient(
+                            0.00f to colors.onShell.copy(alpha = 0.05f),
+                            0.30f to Color.Transparent,
+                        ),
+                    )
+                } else {
+                    drawRect(
+                        Brush.verticalGradient(
+                            0.00f to colors.specular.copy(alpha = 0.42f),
+                            0.62f to Color.Transparent,
+                            1.00f to colors.ink.copy(alpha = 0.14f),
+                        ),
+                    )
+                }
             }
-            .border(
-                HomeOsDims.glassBorder,
-                Brush.linearGradient(
-                    0.00f to colors.onShell.copy(alpha = 0.32f),
-                    0.45f to colors.onShell.copy(alpha = 0.14f),
-                    1.00f to colors.onShell.copy(alpha = 0.07f),
-                ),
-                HomeOsShapes.block,
-            ),
+            // The window onto the 3D views is a block like every other: ink border, hard offset.
+            // It is the only dark surface in the app, which is exactly why it needs the same frame
+            // as everything around it.
+            .border(HomeOsDims.border, colors.border, HomeOsShapes.block),
         contentAlignment = Alignment.Center,
     ) {
         content()
@@ -103,5 +121,6 @@ fun Viewport(
                 modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp),
             )
         }
+    }
     }
 }

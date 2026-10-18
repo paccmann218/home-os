@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -34,6 +35,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
@@ -41,7 +43,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.homeos.bridge.theme.DisplayS
+import com.homeos.bridge.theme.Display
 import com.homeos.bridge.theme.HomeOs
 import com.homeos.bridge.theme.HomeOsDims
 import com.homeos.bridge.theme.HomeOsShapes
@@ -130,7 +132,7 @@ fun PersonAvatar(
         ) {
             Text(
                 text = alias.take(1).uppercase(),
-                style = HomeOs.type.blockTitle.copy(fontFamily = DisplayS),
+                style = HomeOs.type.blockTitle.copy(fontFamily = Display),
                 color = colors.paper,
             )
         }
@@ -140,7 +142,7 @@ fun PersonAvatar(
                     .size(size * 0.30f)
                     .align(Alignment.BottomEnd)
                     .clip(CircleShape)
-                    .background(if (onGlass) colors.shell else colors.paper)
+                    .background(colors.paper)
                     .padding(2.dp)
                     .clip(CircleShape)
                     .background(if (present) colors.green else colors.onShellMuted),
@@ -173,6 +175,8 @@ fun HomeOsTopBar(
     val colors = HomeOs.colors
     val type = HomeOs.type
     val statusBars = WindowInsets.statusBars.asPaddingValues()
+    val borderColor = colors.border
+    val borderPx = with(LocalDensity.current) { HomeOsDims.border.toPx() }
     val dot by animateColorAsState(
         targetValue = if (linked) colors.green else colors.red,
         animationSpec = Motion.effects(),
@@ -182,8 +186,18 @@ fun HomeOsTopBar(
     GlassSurface(
         level = GlassLevel.Chrome,
         shape = RectangleShape,
-        fade = GlassFadeDown,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            // A hard rule under the bar. The dissolve that used to be here was the right answer on
+            // a dark field, where any line reads as chrome bolted on; here every edge in the design
+            // is a hard one and a fading bar is the thing that would look out of place.
+            .drawBehind {
+                drawRect(
+                    color = borderColor,
+                    topLeft = Offset(0f, size.height - borderPx),
+                    size = androidx.compose.ui.geometry.Size(size.width, borderPx),
+                )
+            },
     ) {
         Row(
             Modifier
@@ -265,6 +279,14 @@ fun HomeOsDock(
                 bottom = navBars.calculateBottomPadding() + ShellDims.dockGap,
             ),
     ) {
+        // The offset behind the dock, so it is a block that happens to be see-through rather than
+        // a bubble floating over a field of blocks.
+        Box(
+            Modifier
+                .matchParentSize()
+                .offset(x = HomeOsDims.plateOffset, y = HomeOsDims.plateOffset)
+                .background(colors.plateShadow, HomeOsShapes.pill),
+        )
         GlassSurface(
             level = GlassLevel.Dock,
             shape = HomeOsShapes.pill,
@@ -278,8 +300,8 @@ fun HomeOsDock(
                         position = position,
                         count = Destination.entries.size,
                         accent = colors.teal,
-                        light = colors.onShell,
-                        shade = colors.shellSunk,
+                        light = colors.specular,
+                        shade = colors.ink,
                         inset = 7.dp,
                     ),
                 verticalAlignment = Alignment.CenterVertically,
@@ -306,12 +328,12 @@ private fun DockItem(
 ) {
     val colors = HomeOs.colors
     val iconTint by animateColorAsState(
-        targetValue = if (selected) colors.onShell else colors.onShellMuted,
+        targetValue = if (selected) colors.ink else colors.inkMuted,
         animationSpec = Motion.effects(),
         label = "dockIcon",
     )
     val labelTint by animateColorAsState(
-        targetValue = if (selected) colors.onShell else colors.onShellMuted,
+        targetValue = if (selected) colors.ink else colors.inkMuted,
         animationSpec = Motion.effects(),
         label = "dockLabel",
     )
@@ -353,15 +375,15 @@ fun AblationBanner(modifier: Modifier = Modifier) {
         Icon(
             HomeOsIcons.cloudOff,
             contentDescription = null,
-            tint = colors.red,
+            tint = colors.ink,
             modifier = Modifier.size(18.dp),
         )
         Column {
-            Text("Graph memory off", style = HomeOs.type.label, color = colors.onShell)
+            Text("Graph memory off", style = HomeOs.type.label, color = colors.ink)
             Text(
                 "Fixed rules only: no personalisation, no conflict resolution, no explanations.",
                 style = HomeOs.type.caption,
-                color = colors.onShellMuted,
+                color = colors.inkMuted,
             )
         }
     }

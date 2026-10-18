@@ -12,17 +12,22 @@ import androidx.compose.ui.unit.sp
 import com.homeos.bridge.R
 
 /**
- * Inter v4 variable for the interface, JetBrains Mono variable for machine text.
+ * Space Grotesk for anything that carries weight, Inter for text, JetBrains Mono for machine output.
  *
- * Inter is here for two axes this app genuinely uses. `wght` gives real weights from one file
- * instead of faux-bolding, and `opsz` (14-32 in this build) lets the hero readouts use display
- * letterforms while 11sp labels use text letterforms, so the type stays optically even across a
- * 4x size range. Mono is spent deliberately: it appears only in dev mode and on graph identifiers,
- * where looking like machine output is the point.
+ * The display face used to be Fraunces, a high-contrast serif. It was a defensible choice and it
+ * was quietly working against the whole design: a serif at display size pulls a screen editorial,
+ * and this one is meant to look built rather than published. Space Grotesk is a grotesque with
+ * enough oddity in it — the flattened terminals, the squared bowls — to carry an identity without
+ * the help of a serif, which is the register this style actually wants.
  *
- * Features applied throughout: `tnum` (tabular figures, so an animating number never reflows its
- * neighbours), `zero` (slashed zero), `ss02` (Inter's disambiguation set, which separates I/l/1 and
- * earns its place in a UI full of aliases like p01 and body:naomi), and `calt`.
+ * Inter stays for body text and **all inline numbers**, because it has `tnum` and Space Grotesk's
+ * figures are proportional: a live heart rate set in the display face would change width as it
+ * ticks. Mono is spent deliberately, on dev mode and graph identifiers, where looking like machine
+ * output is the point.
+ *
+ * Features throughout: `tnum` (tabular figures), `zero` (slashed zero), `ss02` (Inter's
+ * disambiguation set, which separates I/l/1 and earns its place in a UI full of aliases like p01
+ * and body:naomi), and `calt`.
  */
 private const val FEATURES = "tnum, zero, ss02, calt"
 
@@ -42,46 +47,21 @@ val Inter = FontFamily(
 )
 
 /**
- * Fraunces: the display voice.
+ * Space Grotesk, variable on `wght` 300-700.
  *
- * A high-contrast variable serif with a real optical-size axis spanning 9-144, which is the reason
- * it is here rather than a one-size display face: the same family can be set at 40sp and at 16sp
- * and stay optically correct, where a single-master serif goes spindly when you scale it down.
- *
- * `WONK` stays at 0 — its quirky alternates are charming on a brand site and wrong on something
- * you read when you feel ill. `SOFT` stays at 0 for crisp terminals against the hard block borders.
- *
- * It carries headings, titles, monograms and the large readouts. It does *not* carry body text or
- * inline numbers: Fraunces has no tabular-figure feature, so anything that ticks stays in Inter,
- * where `tnum` keeps the digits from dancing.
+ * Everything display-sized is set at 700, the top of the axis, because this style has no use for a
+ * medium weight in a heading — the whole point of the face here is mass.
  */
 @OptIn(ExperimentalTextApi::class)
-private fun fraunces(weight: Int, opsz: Int) = Font(
-    resId = R.font.fraunces_variable,
+private fun grotesk(weight: Int) = Font(
+    resId = R.font.space_grotesk_variable,
     weight = FontWeight(weight),
-    variationSettings = FontVariation.Settings(
-        FontVariation.weight(weight),
-        FontVariation.opticalSizing(opsz.sp),
-        FontVariation.Setting("SOFT", 0f),
-        FontVariation.Setting("WONK", 0f),
-    ),
+    variationSettings = FontVariation.Settings(FontVariation.weight(weight)),
 )
 
-private fun frauncesFamily(opsz: Int) = FontFamily(
-    fraunces(400, opsz), fraunces(500, opsz), fraunces(600, opsz), fraunces(700, opsz),
+val Display = FontFamily(
+    grotesk(500), grotesk(600), grotesk(700),
 )
-
-/** 40sp hero readouts and the wordmark. */
-val DisplayXL = frauncesFamily(72)
-
-/** 28sp tile readouts. */
-val DisplayL = frauncesFamily(44)
-
-/** 20sp section headings. */
-val DisplayM = frauncesFamily(28)
-
-/** 16sp block titles. */
-val DisplayS = frauncesFamily(20)
 
 @OptIn(ExperimentalTextApi::class)
 val Mono = FontFamily(
@@ -98,17 +78,21 @@ val Mono = FontFamily(
 )
 
 /**
- * The scale. Tracking tightens as size rises and loosens as it falls, matching Material's own
- * typescale (display sizes negative, 11-12sp labels around +0.03em). Getting that relationship
- * backwards is the most visible typographic tell there is.
+ * The scale.
+ *
+ * Tracking tightens as size rises and loosens as it falls, matching Material's own typescale
+ * (display negative, 11-12sp labels around +0.03em). Getting that relationship backwards is the
+ * most visible typographic tell there is. The display sizes are tracked harder negative than that
+ * convention asks for, because a heavy grotesque set tight is the look and a heavy grotesque set
+ * loose is a road sign.
  */
 @Immutable
 class HomeOsTypography(
-    /** Axis ticks, unit suffixes, the smallest labels. */
+    /** Axis ticks, unit suffixes, the smallest labels. Set uppercase at the call site. */
     val micro: TextStyle,
     val caption: TextStyle,
     val body: TextStyle,
-    /** Control labels, set heavier than body per neobrutalism's weight-500 base. */
+    /** Control labels, set heavier than body per the style's weight-500 base. */
     val label: TextStyle,
     val blockTitle: TextStyle,
     val section: TextStyle,
@@ -122,42 +106,41 @@ class HomeOsTypography(
 
 val HomeOsType = HomeOsTypography(
     micro = TextStyle(
-        fontFamily = Inter, fontWeight = FontWeight.Medium,
-        fontSize = 11.sp, lineHeight = 16.sp, letterSpacing = 0.03.em,
+        fontFamily = Inter, fontWeight = FontWeight.SemiBold,
+        fontSize = 11.sp, lineHeight = 16.sp, letterSpacing = 0.06.em,
         fontFeatureSettings = FEATURES,
     ),
     caption = TextStyle(
         fontFamily = Inter, fontWeight = FontWeight.Normal,
-        fontSize = 12.sp, lineHeight = 16.sp, letterSpacing = 0.025.em,
+        fontSize = 12.sp, lineHeight = 17.sp, letterSpacing = 0.015.em,
         fontFeatureSettings = FEATURES,
     ),
     body = TextStyle(
         fontFamily = Inter, fontWeight = FontWeight.Normal,
-        fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.015.em,
+        fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.01.em,
         fontFeatureSettings = FEATURES,
     ),
     label = TextStyle(
-        fontFamily = Inter, fontWeight = FontWeight.Medium,
-        fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.006.em,
+        fontFamily = Inter, fontWeight = FontWeight.SemiBold,
+        fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.004.em,
         fontFeatureSettings = FEATURES,
     ),
-    // From here down the display serif takes over. Tracking goes neutral-to-negative, because a
-    // high-contrast serif is already generously spaced and letter-spacing it looks amateur.
+    // From here down the grotesque takes over, at the top of its weight axis.
     blockTitle = TextStyle(
-        fontFamily = DisplayS, fontWeight = FontWeight.SemiBold,
-        fontSize = 17.sp, lineHeight = 24.sp, letterSpacing = 0.em,
+        fontFamily = Display, fontWeight = FontWeight.Bold,
+        fontSize = 17.sp, lineHeight = 23.sp, letterSpacing = (-0.01).em,
     ),
     section = TextStyle(
-        fontFamily = DisplayM, fontWeight = FontWeight.SemiBold,
-        fontSize = 22.sp, lineHeight = 29.sp, letterSpacing = (-0.005).em,
+        fontFamily = Display, fontWeight = FontWeight.Bold,
+        fontSize = 23.sp, lineHeight = 28.sp, letterSpacing = (-0.025).em,
     ),
     readout = TextStyle(
-        fontFamily = DisplayL, fontWeight = FontWeight.SemiBold,
-        fontSize = 31.sp, lineHeight = 34.sp, letterSpacing = (-0.012).em,
+        fontFamily = Display, fontWeight = FontWeight.Bold,
+        fontSize = 32.sp, lineHeight = 35.sp, letterSpacing = (-0.035).em,
     ),
     hero = TextStyle(
-        fontFamily = DisplayXL, fontWeight = FontWeight.SemiBold,
-        fontSize = 46.sp, lineHeight = 48.sp, letterSpacing = (-0.02).em,
+        fontFamily = Display, fontWeight = FontWeight.Bold,
+        fontSize = 48.sp, lineHeight = 50.sp, letterSpacing = (-0.045).em,
     ),
     mono = TextStyle(
         fontFamily = Mono, fontWeight = FontWeight.Normal,

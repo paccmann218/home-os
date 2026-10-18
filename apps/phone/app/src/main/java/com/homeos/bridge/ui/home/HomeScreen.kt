@@ -343,6 +343,7 @@ private fun RoomPanel(
             height = 320.dp,
             hint = "drag to turn · tap a device",
             trailing = readout.ifEmpty { null },
+            dark = false,
         ) {
             RoomView(
                 devices = state.home.devices,

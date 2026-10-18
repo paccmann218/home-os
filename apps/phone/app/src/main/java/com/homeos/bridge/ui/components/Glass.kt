@@ -64,18 +64,28 @@ enum class GlassLevel(
     val rimBottom: Float,
     /** Ambient shadow under the surface, so it reads as floating rather than painted on. */
     val lift: Dp,
+    /**
+     * Whether this surface keeps the hard ink border and the offset behind it.
+     *
+     * This is the one technique that makes glass and this style read as one design rather than two
+     * pasted together, and it is the thing every source on the combination independently lands on:
+     * keep the solid high-contrast border. A frosted panel with a soft rim on a field full of
+     * black-bordered blocks looks like it wandered in from a different app; the same panel with a
+     * 3dp ink border and a hard offset is obviously a block that happens to be see-through.
+     */
+    val hardBorder: Boolean,
 ) {
     /** A chip, a tile, a small control. Tint only — see the note on blur above. */
-    Control(blur = 0.dp, surfaceAlpha = 0.74f, sheen = 0.055f, rimTop = 0.24f, rimBottom = 0.06f, lift = 0.dp),
+    Control(blur = 0.dp, surfaceAlpha = 0.74f, sheen = 0.055f, rimTop = 0.24f, rimBottom = 0.06f, lift = 0.dp, hardBorder = false),
 
     /** The top bar. It should recede, so it carries no rim and dissolves downward. */
-    Chrome(blur = 24.dp, surfaceAlpha = 0.72f, sheen = 0.05f, rimTop = 0f, rimBottom = 0f, lift = 0.dp),
+    Chrome(blur = 24.dp, surfaceAlpha = 0.72f, sheen = 0.05f, rimTop = 0f, rimBottom = 0f, lift = 0.dp, hardBorder = false),
 
     /** The floating dock: the most object-like surface in the app, so it is lit the hardest. */
-    Dock(blur = 26.dp, surfaceAlpha = 0.80f, sheen = 0.05f, rimTop = 0.34f, rimBottom = 0.08f, lift = 20.dp),
+    Dock(blur = 26.dp, surfaceAlpha = 0.80f, sheen = 0.06f, rimTop = 0f, rimBottom = 0f, lift = 0.dp, hardBorder = true),
 
     /** A sheet or dialog. Interrupts, so it floats highest. */
-    Sheet(blur = 32.dp, surfaceAlpha = 0.86f, sheen = 0.045f, rimTop = 0.28f, rimBottom = 0.07f, lift = 26.dp),
+    Sheet(blur = 32.dp, surfaceAlpha = 0.86f, sheen = 0.055f, rimTop = 0f, rimBottom = 0f, lift = 0.dp, hardBorder = true),
 }
 
 /**
@@ -156,6 +166,7 @@ fun GlassSurface(
             .then(if (tint != null) Modifier.background(tint, shape) else Modifier)
             .then(
                 when {
+                    level.hardBorder -> Modifier.border(HomeOsDims.border, colors.border, shape)
                     !lit -> Modifier.border(
                         HomeOsDims.glassBorder,
                         colors.onShell.copy(alpha = 0.30f),
@@ -207,16 +218,19 @@ private fun Modifier.glassLight(
     val outline = shape.createOutline(size, layoutDirection, this)
     val stroke = Stroke(HomeOsDims.glassEdge.toPx())
 
+    // Inverted from the dark version, and it has to be: on a light surface the highlight is white
+    // and the shade is ink, where before both came out of the same near-white token because
+    // everything underneath was nearly black.
     val sheen = Brush.verticalGradient(
-        0.00f to colors.onShell.copy(alpha = level.sheen),
-        0.42f to Color.Transparent,
-        1.00f to if (faded) Color.Transparent else colors.shellSunk.copy(alpha = 0.10f),
+        0.00f to colors.specular.copy(alpha = level.sheen * 6f),
+        0.45f to Color.Transparent,
+        1.00f to if (faded) Color.Transparent else colors.ink.copy(alpha = 0.06f),
     )
     val bevel = Brush.verticalGradient(
-        0.00f to colors.onShell.copy(alpha = if (faded) 0.16f else 0.40f),
-        0.22f to colors.onShell.copy(alpha = 0.04f),
+        0.00f to colors.specular.copy(alpha = if (faded) 0.30f else 0.75f),
+        0.24f to colors.specular.copy(alpha = 0.10f),
         0.74f to Color.Transparent,
-        1.00f to if (faded) Color.Transparent else colors.shellSunk.copy(alpha = 0.42f),
+        1.00f to if (faded) Color.Transparent else colors.ink.copy(alpha = 0.18f),
     )
 
     onDrawBehind {
@@ -250,8 +264,8 @@ fun Modifier.frostedSurface(
     if (!HomeOs.glass) {
         return this
             .clip(shape)
-            .background(if (selection > 0.5f) accent.copy(alpha = 0.22f) else colors.shellRaised, shape)
-            .border(HomeOsDims.glassBorder, colors.onShell.copy(alpha = 0.40f), shape)
+            .background(if (selection > 0.5f) accent else colors.paper, shape)
+            .border(HomeOsDims.border, colors.border, shape)
     }
 
     val level = GlassLevel.Control
@@ -259,35 +273,28 @@ fun Modifier.frostedSurface(
         .clip(shape)
         .drawWithCache {
             val outline = shape.createOutline(size, layoutDirection, this)
-            val edge = Stroke(HomeOsDims.glassEdge.toPx())
-            val hair = Stroke(HomeOsDims.glassBorder.toPx())
+            // Centred on the outline inside the clip, so the outer half is thrown away: stroked at
+            // double width, what survives is a full-weight line hugging the edge.
+            val hard = Stroke(HomeOsDims.border.toPx() * 2f)
 
-            val base = colors.shellRaised.copy(alpha = level.surfaceAlpha)
-            val wash = Brush.verticalGradient(
-                0.00f to colors.onShell.copy(alpha = level.sheen + 0.075f * selection),
-                0.45f to accent.copy(alpha = 0.11f * selection),
-                1.00f to colors.shellSunk.copy(alpha = 0.10f * (1f - selection)),
+            // Selected fills with the accent rather than hinting at it. On a field this loud a 10%
+            // wash is not a state, it is a smudge; and the ink border carries the edge regardless,
+            // so the fill is free to be emphatic.
+            val base = androidx.compose.ui.graphics.lerp(
+                colors.paper,
+                accent,
+                0.82f * selection,
             )
-            val bevel = Brush.verticalGradient(
-                0.00f to colors.onShell.copy(alpha = 0.34f + 0.26f * selection),
-                0.26f to colors.onShell.copy(alpha = 0.04f),
-                0.74f to Color.Transparent,
-                1.00f to colors.shellSunk.copy(alpha = 0.34f),
-            )
-            val rimColor = androidx.compose.ui.graphics.lerp(colors.onShell, accent, selection)
-            val rimBrush = Brush.linearGradient(
-                0.00f to rimColor.copy(alpha = level.rimTop + 0.28f * selection),
-                0.45f to rimColor.copy(alpha = level.rimTop * 0.5f + 0.18f * selection),
-                1.00f to rimColor.copy(alpha = level.rimBottom + 0.16f * selection),
-                start = Offset.Zero,
-                end = Offset(size.width, size.height),
+            val sheenBrush = Brush.verticalGradient(
+                0.00f to colors.specular.copy(alpha = 0.34f),
+                0.55f to Color.Transparent,
+                1.00f to colors.ink.copy(alpha = 0.05f),
             )
 
             onDrawBehind {
                 drawOutline(outline, SolidColor(base))
-                drawRect(wash)
-                drawOutline(outline, brush = bevel, style = edge)
-                drawOutline(outline, brush = rimBrush, style = hair)
+                drawRect(sheenBrush)
+                drawOutline(outline, SolidColor(colors.border), style = hard)
             }
         }
 }

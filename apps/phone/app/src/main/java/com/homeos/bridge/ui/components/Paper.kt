@@ -102,14 +102,19 @@ fun PaperBlock(
         if (pressed) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
     }
 
-    val offset = HomeOsDims.plateOffset
-    val plated = lead && plate != Plate.None
-    val railed = !plated && plate != Plate.None
+    // Every block gets the hard offset now, not just the one that leads.
+    //
+    // Earlier versions of this design spent the offset as emphasis, on one block per screen, and
+    // made it chromatic because a black shadow measured 1.38:1 on a near-black shell and could not
+    // be seen. On a bright field a black shadow measures 10.59:1, and the canonical style puts one
+    // under *everything* - that uniformity is the texture, rather than a thing to be rationed.
+    val offset = if (lead) HomeOsDims.plateOffsetLead else HomeOsDims.plateOffset
+    val railed = plate != Plate.None
 
     // Reduced motion keeps the press legible without moving anything: the block stays put and the
     // plate cross-fades out instead.
     val travel by animateDpAsState(
-        targetValue = if (plated && pressed && !reduced) offset else 0.dp,
+        targetValue = if (pressed && !reduced) offset else 0.dp,
         animationSpec = Motion.spatialFast(),
         label = "blockTravel",
     )
@@ -118,14 +123,6 @@ fun PaperBlock(
         animationSpec = Motion.effects(),
         label = "plateAlpha",
     )
-    // Rail blocks compress very slightly instead. Large surfaces need far less of this than chips
-    // do: at 0.96 a full-width card visibly detaches from the screen margin.
-    val press by animateFloatAsState(
-        targetValue = if (!plated && pressed && !reduced) 0.988f else 1f,
-        animationSpec = Motion.spatialFast(),
-        label = "blockPress",
-    )
-
     val focusRing = colors.tealInk
     val focusOffset = HomeOsDims.focusOffset
     val ringWidth = HomeOsDims.focusRing
@@ -137,11 +134,6 @@ fun PaperBlock(
     val railBrush = Brush.verticalGradient(
         listOf(plate.ink(colors), plate.ink(colors).darken(0.84f)),
     )
-    // The sheet, lit. Two stops only, and the lower one is the palette's own sunk tone rather than
-    // an arbitrary grey, so a block and an inset well inside it agree about the light.
-    val paperBrush = Brush.verticalGradient(
-        listOf(colors.paper, lerp(colors.paper, colors.paperSunk, 0.55f)),
-    )
 
     Box(
         modifier
@@ -149,24 +141,16 @@ fun PaperBlock(
             // the screen whether or not a given block happens to lead.
             .padding(end = offset, bottom = offset),
     ) {
-        if (plated) {
-            Box(
-                Modifier
-                    .matchParentSize()
-                    .plateOffset(offset)
-                    .alpha(plateAlpha)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(plate.color(colors), plate.color(colors).darken(0.80f)),
-                        ),
-                        shape,
-                    ),
-            )
-        }
+        Box(
+            Modifier
+                .matchParentSize()
+                .plateOffset(offset)
+                .alpha(plateAlpha)
+                .background(colors.plateShadow, shape),
+        )
         Column(
             Modifier
                 .plateOffset(travel)
-                .graphicsLayer { scaleX = press; scaleY = press }
                 .then(if (fillHeight) Modifier.fillMaxHeight() else Modifier)
                 .defaultMinSize(minHeight = if (onClick != null) HomeOsDims.minTouch else 0.dp)
                 .drawBehind {
@@ -181,21 +165,6 @@ fun PaperBlock(
                         drawOutline(outline, focusRing, style = Stroke(ringWidth.toPx()))
                     }
                 }
-                // A tight contact shadow where there is no plate, so an unplated block still sits
-                // on the shell rather than being pasted flat onto it.
-                .then(
-                    if (plated) {
-                        Modifier
-                    } else {
-                        Modifier.shadow(
-                            elevation = 9.dp,
-                            shape = shape,
-                            clip = false,
-                            ambientColor = Color.Black,
-                            spotColor = Color.Black,
-                        )
-                    },
-                )
                 .clip(shape)
                 .then(
                     if (onClick != null) {
@@ -208,7 +177,9 @@ fun PaperBlock(
                         Modifier
                     },
                 )
-                .background(paperBrush, shape)
+                // Flat. A gradient on a block is the one thing this style will not have: the
+                // fill is a single value and the only modelling anywhere is the hard offset.
+                .background(colors.paper, shape)
                 .then(
                     if (railed) {
                         Modifier.drawBehind {

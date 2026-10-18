@@ -6,11 +6,15 @@
     counterpart shows up as a flash on every single launch.
 -->
 <resources>
-    <color name="shell">#FF070F0F</color>
+    <color name="shell">#FF5EC9C0</color>
     <color name="shell_raised">#FF141C1D</color>
     <color name="shell_sunk">#FF030707</color>
-    <color name="on_shell">#FFE2EAEA</color>
-    <color name="on_shell_muted">#FF96A1A1</color>
+    <color name="on_shell">#FF131719</color>
+    <color name="on_shell_muted">#FF3F4347</color>
     <color name="teal">#FF60D3CD</color>
+    <!-- The notification card keeps the dark surface it was designed with: it is rendered in
+         the system shade, not on the app's field. -->
+    <color name="notif_text">#FFE6ECEC</color>
+    <color name="notif_text_muted">#FFA6B3B3</color>
     <color name="transparent">#00000000</color>
 </resources>

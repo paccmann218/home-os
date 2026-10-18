@@ -118,11 +118,11 @@ fun HomeOsTheme(content: @Composable () -> Unit) {
     val scheme = remember(colors) {
         darkColorScheme(
             primary = colors.teal,
-            onPrimary = colors.shell,
+            onPrimary = colors.ink,
             secondary = colors.violet,
-            onSecondary = colors.shell,
+            onSecondary = colors.ink,
             tertiary = colors.amber,
-            onTertiary = colors.shell,
+            onTertiary = colors.ink,
             background = colors.shell,
             onBackground = colors.onShell,
             surface = colors.shellRaised,
@@ -131,7 +131,7 @@ fun HomeOsTheme(content: @Composable () -> Unit) {
             onSurfaceVariant = colors.onShellMuted,
             outline = colors.onShellMuted,
             error = colors.red,
-            onError = colors.shell,
+            onError = colors.paper,
         )
     }
 
