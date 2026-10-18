@@ -16,3 +16,5 @@ replay/recordings/*.tmp
 scratch-*.log
 backend/scratch/
 replay/recordings/*.jsonl.tmp
+# Large media and the iQOO demo re-edit (a different hackathon's project)
+video/

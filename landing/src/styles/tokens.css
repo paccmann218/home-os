@@ -1,0 +1,200 @@
+/*
+ * HomeOS design tokens.
+ *
+ * The palette is the phone app's (apps/phone/.../theme/Color.kt): authored in OKLCH, gamut-mapped
+ * to sRGB, and audited for contrast. Accents ship as pairs, exactly like the app: a bright "fill"
+ * tone for plates and marks, and a deep "ink" tone for text. On the dark theme the bright tones
+ * become the text tones, because they are the ones that carry on a dark field.
+ *
+ * Daylight is the default. Night follows the system unless the visitor picks one
+ * (html[data-theme="light" | "dark"], set by the theme toggle).
+ */
+
+:root {
+  /* Type: Bricolage Grotesque for display, Inter for reading (tabular figures), JetBrains Mono for data. */
+  --font-display: "Bricolage Grotesque Variable", "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  --step--2: clamp(0.72rem, 0.7rem + 0.1vw, 0.78rem);
+  --step--1: clamp(0.84rem, 0.81rem + 0.15vw, 0.92rem);
+  --step-0: clamp(1rem, 0.96rem + 0.2vw, 1.075rem);
+  --step-1: clamp(1.18rem, 1.08rem + 0.45vw, 1.42rem);
+  --step-2: clamp(1.45rem, 1.24rem + 0.95vw, 2rem);
+  --step-3: clamp(1.9rem, 1.45rem + 2vw, 3.1rem);
+  --step-4: clamp(2.6rem, 1.7rem + 4.1vw, 5.2rem);
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4.5rem;
+  --space-9: 7rem;
+
+  --radius-s: 10px;
+  --radius-m: 16px;
+  --radius-l: 26px;
+  --radius-pill: 999px;
+
+  --wrap: 1180px;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --dur: 420ms;
+
+  /* The app's fixed brand tones, the same in both themes. */
+  --field-bloom: #fce4c6;
+  --field-mid: #eda85c;
+  --field-deep: #d98f44;
+  --espresso: #2a1e14;
+}
+
+/* ---------- Daylight ---------- */
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #fffbf5; /* paper */
+  --bg-sunk: #f3eadd; /* paper, sunk */
+  --surface: #fffdf9;
+  --surface-2: #f7efe3;
+
+  --ink: #1e1813; /* 16.1:1 on paper */
+  --ink-2: #4a423a; /* 9.6:1 on paper */
+  --ink-3: #5f544a; /* captions, >= 4.5:1 on every daylight surface */
+  --line: rgba(30, 24, 19, 0.13);
+  --border: #1e1813;
+  --plate-shadow: #2a1e14;
+
+  --accent: #9c4713; /* the app's "lens": burnt sienna */
+  --accent-hover: #823a0e;
+  --on-accent: #fffbf5;
+
+  --teal: #0b625e;
+  --violet: #543a8b;
+  --amber: #7c550f;
+  --red: #a32418;
+  --green: #0b6548;
+
+  --teal-fill: #60d3cd;
+  --violet-fill: #b6a2f3;
+  --amber-fill: #ddba56;
+  --red-fill: #f56f57;
+  --green-fill: #67cfa5;
+  --on-fill: #1e1813;
+
+  --tint-teal: rgba(96, 211, 205, 0.22);
+  --tint-violet: rgba(182, 162, 243, 0.24);
+  --tint-amber: rgba(221, 186, 86, 0.26);
+  --tint-red: rgba(245, 111, 87, 0.18);
+  --tint-green: rgba(103, 207, 165, 0.22);
+
+  --glass: rgba(255, 251, 245, 0.72);
+  --hero-glow:
+    radial-gradient(70% 75% at 88% 6%, rgba(237, 168, 92, 0.62) 0%, rgba(237, 168, 92, 0) 62%),
+    radial-gradient(55% 60% at 6% 96%, rgba(252, 228, 198, 0.95) 0%, rgba(252, 228, 198, 0) 70%);
+  --art-stroke: #1e1813;
+  --art-fill: #fffdf9;
+  --art-fill-2: #f3eadd;
+  --screen: #120e0b;
+}
+
+/* ---------- Night ---------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --bg: #120e0b; /* the app's shell, sunk */
+    --bg-sunk: #0c0907;
+    --surface: #1b1511;
+    --surface-2: #251d17;
+
+    --ink: #f3eadd; /* warm, never white */
+    --ink-2: #cfbfac;
+    --ink-3: #a8978a;
+    --line: rgba(243, 234, 221, 0.12);
+    --border: rgba(243, 234, 221, 0.24);
+    --plate-shadow: #000000;
+
+    --accent: #eda85c; /* the field's amber */
+    --accent-hover: #f4bd7e;
+    --on-accent: #1e1813;
+
+    --teal: #60d3cd;
+    --violet: #b6a2f3;
+    --amber: #ddba56;
+    --red: #f56f57;
+    --green: #67cfa5;
+
+    --teal-fill: #60d3cd;
+    --violet-fill: #b6a2f3;
+    --amber-fill: #ddba56;
+    --red-fill: #f56f57;
+    --green-fill: #67cfa5;
+    --on-fill: #1e1813;
+
+    --tint-teal: rgba(96, 211, 205, 0.13);
+    --tint-violet: rgba(182, 162, 243, 0.14);
+    --tint-amber: rgba(221, 186, 86, 0.14);
+    --tint-red: rgba(245, 111, 87, 0.14);
+    --tint-green: rgba(103, 207, 165, 0.13);
+
+    --glass: rgba(18, 14, 11, 0.74);
+    --hero-glow:
+      radial-gradient(65% 70% at 86% 4%, rgba(217, 143, 68, 0.3) 0%, rgba(217, 143, 68, 0) 64%),
+      radial-gradient(50% 55% at 4% 100%, rgba(156, 71, 19, 0.28) 0%, rgba(156, 71, 19, 0) 70%);
+    --art-stroke: #f3eadd;
+    --art-fill: #1b1511;
+    --art-fill-2: #251d17;
+    --screen: #050403;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #120e0b;
+  --bg-sunk: #0c0907;
+  --surface: #1b1511;
+  --surface-2: #251d17;
+
+  --ink: #f3eadd;
+  --ink-2: #cfbfac;
+  --ink-3: #a8978a;
+  --line: rgba(243, 234, 221, 0.12);
+  --border: rgba(243, 234, 221, 0.24);
+  --plate-shadow: #000000;
+
+  --accent: #eda85c;
+  --accent-hover: #f4bd7e;
+  --on-accent: #1e1813;
+
+  --teal: #60d3cd;
+  --violet: #b6a2f3;
+  --amber: #ddba56;
+  --red: #f56f57;
+  --green: #67cfa5;
+
+  --teal-fill: #60d3cd;
+  --violet-fill: #b6a2f3;
+  --amber-fill: #ddba56;
+  --red-fill: #f56f57;
+  --green-fill: #67cfa5;
+  --on-fill: #1e1813;
+
+  --tint-teal: rgba(96, 211, 205, 0.13);
+  --tint-violet: rgba(182, 162, 243, 0.14);
+  --tint-amber: rgba(221, 186, 86, 0.14);
+  --tint-red: rgba(245, 111, 87, 0.14);
+  --tint-green: rgba(103, 207, 165, 0.13);
+
+  --glass: rgba(18, 14, 11, 0.74);
+  --hero-glow:
+    radial-gradient(65% 70% at 86% 4%, rgba(217, 143, 68, 0.3) 0%, rgba(217, 143, 68, 0) 64%),
+    radial-gradient(50% 55% at 4% 100%, rgba(156, 71, 19, 0.28) 0%, rgba(156, 71, 19, 0) 70%);
+  --art-stroke: #f3eadd;
+  --art-fill: #1b1511;
+  --art-fill-2: #251d17;
+  --screen: #050403;
+}
