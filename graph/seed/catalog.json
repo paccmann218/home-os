@@ -60,6 +60,18 @@
       }
     },
     {
+      "id": "clock",
+      "room": "bedroom",
+      "kind": "alarm",
+      "driver": "virtual",
+      "name": "Google Clock",
+      "min": 0,
+      "max": 1,
+      "state": {
+        "power": "off"
+      }
+    },
+    {
       "id": "env",
       "room": "bedroom",
       "kind": "sensor",

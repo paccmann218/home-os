@@ -12,6 +12,7 @@ import { contextBands, type Context } from "../ingest/bands.js";
 import { latestHr, meanHr, rmssd, latestRoom, hrSamples } from "../ingest/buffer.js";
 import { bus, newId } from "../bus.js";
 import { prompt, say } from "../channels.js";
+import { proposeMorning, tryAnswerMorning } from "./morning.js";
 
 const MIN = 60_000;
 
@@ -80,6 +81,7 @@ export async function handleChip(alias: string, chip: string, source = "watch") 
     await say(alias, chip === "better" ? "Good to hear. I'll remember that." : "Sorry. I'll remember that and try something else.");
     return { feedback: r };
   }
+  if (chip === "morning") return proposeMorning(alias);
   if (chip === "fine" || chip === "well") {
     for (const k of ["sick", "fever", "cold_symptoms", "headache", "stressed"]) await w.clearCondition(alias, k, source).catch(() => undefined);
     await say(alias, "Glad you're feeling better. Back to your usual settings.");
@@ -160,6 +162,8 @@ export async function checkRestingHr(alias: string, rhr: number) {
 const pendingPrompts = new Map<string, { alias: string; kind: string }>();
 
 export async function answerPrompt(alias: string, id: string, answer: string) {
+  const morning = await tryAnswerMorning(alias, id, answer);
+  if (morning) return morning;
   const p = pendingPrompts.get(id);
   if (!p || p.alias !== alias) return null;
   pendingPrompts.delete(id);

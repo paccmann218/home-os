@@ -32,6 +32,7 @@ export function Room({ devices, flash }: { devices: Device[]; flash: Set<string>
   const fan = by.fan?.state ?? {};
   const light = by.light?.state ?? {};
   const env = by.env?.state ?? {};
+  const clock = by.clock?.state ?? {};
   const tile = (id: string, label: string, value: string, sub: string, on: boolean) => (
     <div className={`device ${on ? "on" : ""} ${flash.has(id) ? "flash" : ""}`} key={id}>
       {by[id]?.leased_by && <span className="lease">⚿ {by[id].leased_by}</span>}
@@ -45,6 +46,13 @@ export function Room({ devices, flash }: { devices: Device[]; flash: Set<string>
       {tile("ac", "Air conditioner", ac.power === "on" ? `${ac.setpoint} °C` : "Off", ac.power === "on" ? "cooling to setpoint" : "standby", ac.power === "on")}
       {tile("fan", "Fan", fan.level ? `Level ${fan.level}` : "Off", "0–3", (fan.level ?? 0) > 0)}
       {tile("light", "Light (ESP32)", light.brightness ? `${light.brightness}%` : "Off", "dimmable LED", (light.brightness ?? 0) > 0)}
+      {tile(
+        "clock",
+        "Google Clock",
+        clock.alarm_primary ? `${clock.alarm_primary} · ${clock.alarm_backup}` : "No alarm",
+        clock.set_for ? `set for ${clock.set_for}` : "bedroom",
+        Boolean(clock.alarm_primary),
+      )}
       {tile(
         "env",
         "Room sensor",

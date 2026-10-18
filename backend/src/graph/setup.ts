@@ -127,6 +127,11 @@ export async function seedHome(): Promise<void> {
     affects: catalog.affects,
   });
   await run(g, seed("home_people_agents"), { people: config.people });
+  await run(g, seed("home_routines"));
+  await run(g, seed("home_scenes"));
+  await run(g, seed("home_policies"));
+  await run(g, seed("home_zones"));
+  await run(g, seed("home_clock"));
 }
 
 export async function seedBody(alias: string): Promise<void> {
@@ -146,6 +151,11 @@ export async function seedBody(alias: string): Promise<void> {
   await run(g, seed("body_preferences"), { alias, preferences: catalog.preferences, now: now(), forever: FOREVER });
   await run(g, seed("body_evidence"), { priors: catalog.evidence_priors });
   await run(g, seed("body_playbooks"), { playbooks: catalog.playbooks, now: now() });
+  await run(g, seed("body_calendar"), { alias });
+  await run(g, seed("body_goals"), { alias });
+  await run(g, seed("body_habits"), { alias });
+  await run(g, seed("body_sources"), { alias });
+  await run(g, seed("body_roles"), { alias });
 }
 
 export async function resetAll(): Promise<void> {

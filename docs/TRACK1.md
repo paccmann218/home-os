@@ -32,7 +32,7 @@ The query goes Room → Device → Var → Signal, and Room → Person → Const
 
 ## 2. Graph queries and algorithms as agent tools
 
-[`backend/src/tools/index.ts`](../backend/src/tools/index.ts) defines 19 tools. The graph-algorithm ones:
+[`backend/src/tools/index.ts`](../backend/src/tools/index.ts) defines 40 tools. The graph-algorithm ones:
 
 | Tool | Algorithm | Question it answers |
 |---|---|---|
@@ -56,7 +56,7 @@ The cause-chain weights are learned. The Scientist sets each band's `neglogp = �
 
 ## 3. Tool selection through MCP
 
-- [`backend/src/mcp/server.ts`](../backend/src/mcp/server.ts) (**homeos-mcp**) exposes all 19 tools over stdio. One instance runs per person and connects to FalkorDB with that person's ACL user.
+- [`backend/src/mcp/server.ts`](../backend/src/mcp/server.ts) (**homeos-mcp**) exposes all 40 tools over stdio. One instance runs per person and connects to FalkorDB with that person's ACL user.
 - [`backend/src/llm/agent.ts`](../backend/src/llm/agent.ts) also attaches the official **FalkorDB MCP server** (`@falkordb/mcpserver`) as the read-only `home_reader` user. Only its read-only, schema and list tools are exposed.
 - The Planner and Coach run on Azure OpenAI (`gpt-5.4-mini`), which picks tools from both servers. The dashboard feed shows each `MCP tool → …` call live.
 
@@ -85,3 +85,17 @@ Every decision leaves a provenance subgraph in the owner's private graph:
 - The owner hears their own reasons ("your own comfort (sick)").
 - Other people's constraints appear only as "someone present", because their reasons do not exist in the home graph.
 - The dashboard highlights the same paths ([`explain_paths.cypher`](../graph/queries/explain_paths.cypher)).
+
+## 6. A decision that only exists because two memories connect
+
+The morning alarm is the same pattern on a different question. A calendar row and a sleep row do not, by themselves, say what the clock should do. The agent runs [`morning_case.cypher`](../graph/queries/morning_case.cypher) in the person's private graph:
+
+```cypher
+MATCH (p:Person {alias: $alias})-[:HAS_EVENT]->(ev:Event)
+WHERE ev.kind = 'calendar' AND ev.at >= $now AND ev.at <= $now + $horizon
+WITH ev ORDER BY ev.at ASC LIMIT 1
+OPTIONAL MATCH (p:Person {alias: $alias})-[:HAD]->(s:Episode {kind: 'sleep'})
+WHERE s.start >= $now - 7 * 86400000
+```
+
+Calendar events arrive through `POST /api/calendar/:alias`, which runs [`upsert_calendar_event.cypher`](../graph/queries/upsert_calendar_event.cypher). Nights arrive through Health Connect ingest, each one an `Episode` with a `quality`. If the next event is before 09:00 local and enough of the last seven nights are bad, the watch is asked to confirm. Only a yes writes [`record_morning_decision.cypher`](../graph/queries/record_morning_decision.cypher) (`Decision -DERIVED_FROM-> Event` and `Decision -DERIVED_FROM-> Episode`) and sets the bedroom `clock` device on the home graph. An empty traversal is spoken as an empty traversal: no early event, or the ring has not synced. The sentence is filled from the rows. The model does not invent the times.

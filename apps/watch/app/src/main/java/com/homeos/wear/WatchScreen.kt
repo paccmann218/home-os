@@ -102,6 +102,7 @@ private val CHIPS = listOf(
     "workout" to "Workout done",
     "stressed" to "Stressed",
     "headache" to "Headache",
+    "morning" to "Morning alarm",
     "sleep" to "Going to sleep",
     "fine" to "I'm fine",
     "better" to "That helped",
@@ -117,23 +118,18 @@ fun WatchScreen(
     onMic: () -> Unit,
     onPrompt: (String) -> Unit,
     onStopPacer: () -> Unit,
-    onAlarmYes: () -> Unit,
-    onAlarmNo: () -> Unit,
-    onAlarmReplay: () -> Unit,
-    onAlarmDismiss: () -> Unit,
 ) {
     Box(Modifier.fillMaxSize().background(Field)) {
         when {
-            ui.alarm != null -> AlarmDemoView(ui, onAlarmYes, onAlarmNo, onAlarmReplay, onAlarmDismiss)
             ui.prompt != null -> PromptView(ui.prompt, onPrompt)
             ui.pacerBpm != null -> PacerView(ui.pacerBpm, ui.pacerEndsAt, onStopPacer)
-            else -> Home(ui, onChip, onMic, onAlarmReplay)
+            else -> Home(ui, onChip, onMic)
         }
     }
 }
 
 @Composable
-private fun Home(ui: WatchUi, onChip: (String) -> Unit, onMic: () -> Unit, onAlarmReplay: () -> Unit) {
+private fun Home(ui: WatchUi, onChip: (String) -> Unit, onMic: () -> Unit) {
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 1)
     val hr = ui.hr?.toString() ?: "--"
     val meta = "${ui.alias} · HR $hr${if (ui.ibi) " · HRV" else ""}"
@@ -146,17 +142,17 @@ private fun Home(ui: WatchUi, onChip: (String) -> Unit, onMic: () -> Unit, onAla
     ScalingLazyColumn(
         modifier = Modifier.fillMaxSize().background(Field),
         state = listState,
-        contentPadding = PaddingValues(horizontal = Inset, vertical = Inset),
+        contentPadding = PaddingValues(horizontal = Inset, vertical = 22.dp),
         autoCentering = AutoCenteringParams(itemIndex = 1),
-        // No edge fade and no fisheye. Chips stay one size; the 16dp inset and the
-        // 148dp column keep the shadow inside the round bezel.
+        // Full size through the middle. Near the chin the block scales down, still
+        // opaque, so the 3dp shadow stays inside the circle instead of being cut off.
         scalingParams = ScalingLazyColumnDefaults.scalingParams(
-            edgeScale = 1f,
+            edgeScale = 0.72f,
             edgeAlpha = 1f,
-            minElementHeight = 0.2f,
-            maxElementHeight = 0.8f,
-            minTransitionArea = 0.5f,
-            maxTransitionArea = 0.5f,
+            minElementHeight = 0.15f,
+            maxElementHeight = 0.45f,
+            minTransitionArea = 0.46f,
+            maxTransitionArea = 0.68f,
         ),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -212,98 +208,10 @@ private fun Home(ui: WatchUi, onChip: (String) -> Unit, onMic: () -> Unit, onAla
                 }
             }
         }
-        item(key = "alarm") {
-            BrutalButton(
-                "Morning alarm",
-                onClick = onAlarmReplay,
-                accent = true,
-                modifier = Modifier.safeWidth(),
-            )
-        }
         CHIPS.forEach { (key, label) ->
             item(key = key) {
                 BrutalButton(label, onClick = { onChip(key) }, modifier = Modifier.safeWidth())
             }
-        }
-    }
-}
-
-@Composable
-private fun AlarmDemoView(
-    ui: WatchUi,
-    onYes: () -> Unit,
-    onNo: () -> Unit,
-    onReplay: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val alarm = ui.alarm ?: return
-    SafeCenter {
-        WatchText(alarm.title, Ink, Title, Modifier.fillMaxWidth(), maxLines = 2)
-        if (alarm.done) {
-            TimePair(alarm.detail)
-        } else if (alarm.detail.isNotBlank()) {
-            WatchText(alarm.detail, Ink, Body, Modifier.fillMaxWidth(), maxLines = 2)
-        }
-        when {
-            alarm.listening -> {
-                val cue = if (ui.heard.isNotBlank()) ui.heard else "Listening…"
-                WatchText(
-                    cue,
-                    if (ui.heard.isNotBlank()) InkMuted else Accent,
-                    Body,
-                    Modifier.fillMaxWidth(),
-                )
-                ActionRow(
-                    listOf(
-                        Triple("Yes", true, onYes),
-                        Triple("No", false, onNo),
-                    ),
-                )
-            }
-            alarm.done -> ActionRow(
-                listOf(
-                    Triple("Again", false, onReplay),
-                    Triple("Home", false, onDismiss),
-                ),
-            )
-            else -> {
-                val status = if (ui.thinking) "Speaking…" else ui.status
-                if (status.isNotBlank() && status != alarm.title && status != alarm.detail) {
-                    WatchText(status, Accent, Body, Modifier.fillMaxWidth())
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TimePair(detail: String) {
-    val meridian = when {
-        detail.contains("PM", ignoreCase = true) -> "PM"
-        detail.contains("AM", ignoreCase = true) -> "AM"
-        else -> null
-    }
-    val times = detail
-        .split('·', '•')
-        .map { it.replace("AM", "", ignoreCase = true).replace("PM", "", ignoreCase = true).trim() }
-        .filter { it.isNotEmpty() }
-    if (times.size < 2) {
-        WatchText(detail, Ink, Title, Modifier.fillMaxWidth())
-        return
-    }
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            times.take(2).forEach { time ->
-                Brutal(stretch = false, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)) {
-                    WatchText(time, Ink, Title.copy(fontSize = 16.sp, lineHeight = 18.sp))
-                }
-            }
-        }
-        if (meridian != null) {
-            WatchText(meridian, Ink, Micro, Modifier.padding(top = 2.dp))
         }
     }
 }

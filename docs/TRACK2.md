@@ -51,3 +51,7 @@ Results ([`results/concurrency.json`](results/concurrency.json)):
 - [`setup.ts › createAclUsers`](../backend/src/graph/setup.ts) creates one Redis ACL user per person's agents with key pattern `~body:<alias>`. A separate `home_reader` user can only `GRAPH.RO_QUERY` the home graph.
 - Tested (`test/core.test.ts › tenant isolation is enforced by FalkorDB ACL`): `agent_bob` reading `body:alice` gets `NOPERM`, and `home_reader` cannot write.
 - **The privacy boundary is structural.** `refreshConstraints` computes a person's needs in their private graph and records *why* there (`ConstraintExport -DERIVED_FROM→ Condition`). It publishes only `{var, min, max, priority}` to the home graph. Explanations to other people therefore cannot leak a reason, because the reason is not in any graph they can read.
+
+## Memory the next session can find
+
+A calendar event is a node (`Person -HAS_EVENT-> Event`), not a note in the prompt. A night from the ring is an `Episode` that stays after the phone sync ends. The morning decision is another node, linked to both, so the next time someone asks why the clock changed, `explain` walks `Decision -DERIVED_FROM-> Event` and `Decision -DERIVED_FROM-> Episode` instead of reconstructing the story. Restart FalkorDB and those nodes are still there. The clock's two alarms live on the shared home graph as device state, which every agent can read and none of them can scribble over with free-form Cypher.
