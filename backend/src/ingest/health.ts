@@ -1,6 +1,6 @@
 /**
  * Health Connect ingest (ring data via the phone app). Gabit writes sleep stages, heart rate,
- * resting HR, steps, VO2max and calories into Health Connect; the HomeOS Bridge app reads them
+ * resting HR, steps, VO2max and, when Gabit has shared it, menstrual period and flow.
  * (including months of history) and posts them here. Each night becomes a sleep Episode linked to
  * context bands, so the Scientist's graph algorithms run over the person's real history.
  */
@@ -27,9 +27,31 @@ export interface HealthBatch {
   hrv?: { t: number; rmssd: number }[];
   skin_temp?: { t: number; delta: number }[];
   vo2max?: { t: number; value: number }[];
+  /** Period windows Gabit (or another app) wrote to Health Connect. Private to this person. */
+  menstruation?: { start: number; end: number }[];
+  menstruation_flow?: { t: number; flow: string }[];
 }
 
 const DAY = 86_400_000;
+
+/** A logged period that still applies. Gabit often writes a short window for "started today"; treat that as four days, matching the phone's Period chip. */
+function activePeriod(b: HealthBatch): { until: number; flow?: string } | null {
+  const t = now();
+  const flows = b.menstruation_flow ?? [];
+  const flowAt = (start: number, end: number) => flows.filter((f) => f.t >= start && f.t <= end).sort((a, c) => c.t - a.t)[0]?.flow;
+  const windows = (b.menstruation ?? []).map((p) => {
+    const span = p.end - p.start;
+    const until = span < 12 * 3_600_000 ? p.start + 4 * DAY : p.end;
+    return { start: p.start, until, flow: flowAt(p.start, Math.max(p.end, until)) };
+  });
+  const recentFlow = flows.filter((f) => t - f.t < 4 * DAY).sort((a, c) => c.t - a.t)[0];
+  if (recentFlow && !windows.some((w) => recentFlow.t >= w.start && recentFlow.t <= w.until)) {
+    windows.push({ start: recentFlow.t, until: recentFlow.t + 4 * DAY, flow: recentFlow.flow });
+  }
+  const open = windows.filter((w) => w.start <= t + DAY && w.until > t).sort((a, c) => c.start - a.start);
+  return open[0] ? { until: open[0].until, flow: open[0].flow } : null;
+}
+
 const median = (a: number[]) => {
   if (!a.length) return NaN;
   const s = [...a].sort((x, y) => x - y);
@@ -48,7 +70,7 @@ async function existingSleepIds(alias: string): Promise<Set<string>> {
 }
 
 export async function ingestHealth(alias: string, b: HealthBatch) {
-  const out = { nights: 0, newNights: 0, baselines: [] as string[] };
+  const out = { nights: 0, newNights: 0, baselines: [] as string[], periods: b.menstruation?.length ?? 0, activePeriod: false };
 
   // Recent heart-rate samples also feed the live buffer (ring HR when the watch is off).
   for (const s of (b.heart_rate ?? []).filter((x) => now() - x.t < 15 * 60_000)) pushHr(alias, { t: s.t, hr: s.bpm });
@@ -129,6 +151,19 @@ export async function ingestHealth(alias: string, b: HealthBatch) {
   }
 
   if (out.newNights) bus.feed({ agent: `guardian:${alias}`, kind: "sync", person: alias, text: `Synced ${out.newNights} new night(s) from the ring (Health Connect)` });
+  const period = activePeriod(b);
+  if (period) {
+    const hours = Math.max(6, Math.min(24 * 10, (period.until - now()) / 3_600_000));
+    const note = period.flow ? `flow ${period.flow}, from Health Connect` : "from Health Connect";
+    await w.setCondition(alias, "menstrual", { hours, source: "health_connect", note });
+    out.activePeriod = true;
+    bus.feed({
+      agent: `guardian:${alias}`,
+      kind: "condition",
+      person: alias,
+      text: `Period recorded for ${alias} (private). The home only learns that the room should stay at 25 °C or warmer.`,
+    });
+  }
   const latestRhr = (b.resting_hr ?? []).sort((x, y) => y.t - x.t)[0];
   if (latestRhr && now() - latestRhr.t < 36 * 3600_000) void checkRestingHr(alias, latestRhr.bpm);
   return out;
