@@ -45,6 +45,10 @@ class MainActivity : ComponentActivity() {
                 onMic = { if (ui.serverVoice) vm.toggleRecording() else listen() },
                 onPrompt = vm::answerPrompt,
                 onStopPacer = vm::stopPacer,
+                onAlarmYes = vm::confirmAlarm,
+                onAlarmNo = vm::declineAlarm,
+                onAlarmReplay = vm::replayAlarmDemo,
+                onAlarmDismiss = vm::dismissAlarmDemo,
             )
         }
     }

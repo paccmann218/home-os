@@ -32,6 +32,13 @@ class AudioBridge(private val context: Context) {
     private var captureThread: Thread? = null
     private val pcm = ByteArrayOutputStream()
 
+    /**
+     * Set before [startRecording] during the alarm demo. Fired once, off the capture thread,
+     * after speech followed by a short silence, so the watch can send the clip to Sarvam.
+     */
+    @Volatile
+    var speechEndpoint: (() -> Unit)? = null
+
     fun startRecording(): Boolean {
         if (recording) return false
         val sampleRate = 16_000
@@ -70,6 +77,9 @@ class AudioBridge(private val context: Context) {
 
         captureThread = Thread({
             val buf = ByteArray(minBuf.coerceAtLeast(2048))
+            val startedAt = System.currentTimeMillis()
+            var heardSpeech = false
+            var silentSince = 0L
             while (recording) {
                 val n = try {
                     record.read(buf, 0, buf.size)
@@ -79,6 +89,19 @@ class AudioBridge(private val context: Context) {
                 if (n > 0) {
                     synchronized(pcm) {
                         pcm.write(buf, 0, n)
+                    }
+                    val hook = speechEndpoint
+                    if (hook != null && System.currentTimeMillis() - startedAt > 450) {
+                        if (pcmRms(buf, n) > 550) {
+                            heardSpeech = true
+                            silentSince = 0L
+                        } else if (heardSpeech) {
+                            if (silentSince == 0L) silentSince = System.currentTimeMillis()
+                            else if (System.currentTimeMillis() - silentSince > 800) {
+                                speechEndpoint = null
+                                Thread({ hook() }, "homeos-endpoint").start()
+                            }
+                        }
                     }
                 } else if (n < 0) {
                     Log.w(tag, "AudioRecord.read error: $n")
@@ -93,6 +116,7 @@ class AudioBridge(private val context: Context) {
     }
 
     fun stopRecordingToWavBase64(): String? {
+        speechEndpoint = null
         if (!recording && recorder == null) return null
         recording = false
         val record = recorder
@@ -209,6 +233,20 @@ class AudioBridge(private val context: Context) {
             "TTS play failed: ${lastError?.message}",
             lastError,
         )
+    }
+
+    private fun pcmRms(buf: ByteArray, n: Int): Double {
+        var sum = 0.0
+        var count = 0
+        var i = 0
+        while (i + 1 < n) {
+            val sample = (buf[i].toInt() and 0xff) or (buf[i + 1].toInt() shl 8)
+            val s = sample.toShort().toInt()
+            sum += s * s
+            count++
+            i += 2
+        }
+        return if (count == 0) 0.0 else kotlin.math.sqrt(sum / count)
     }
 
     private fun pcm16ToWav(pcm: ByteArray, sampleRate: Int): ByteArray {
