@@ -76,10 +76,12 @@ fun BaselineBand(
     val bandStart = ((baseline.mean - sd - low) / (high - low)).coerceIn(0f, 1f)
     val bandEnd = ((baseline.mean + sd - low) / (high - low)).coerceIn(0f, 1f)
 
+    val well = wellFill()
+
     Canvas(modifier.fillMaxWidth().height(22.dp)) {
         val radius = CornerRadius(5.dp.toPx())
         // The rail: everything three sd either side of usual.
-        drawRoundRect(color = colors.paperSunk, size = size, cornerRadius = radius)
+        drawRoundRect(color = well, size = size, cornerRadius = radius)
         // The usual range. A tint of ink rather than a hue, so it never competes with the marker.
         drawRoundRect(
             color = colors.ink.copy(alpha = 0.10f),

@@ -31,7 +31,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -58,22 +60,24 @@ import com.homeos.bridge.theme.color
 import com.homeos.bridge.theme.ink
 
 /**
- * A paper block: the only surface in this app that holds content.
+ * A block: the only surface in this app that holds content.
  *
- * Warm off-white, a 2dp near-black border, and a faint sheen down the face. The border is
- * load-bearing — it supplies the 3:1 non-text contrast that identifies a surface, which a
- * translucent one can never guarantee — and so is the fact that the fill is not flat: a single
- * value across a 300dp card is what makes a card look like a rectangle of paint rather than a
- * sheet with light falling across it.
+ * It is made of one of two materials, and which one is decided by [LocalOnGlass] rather than by
+ * the call site, so no screen has to know.
  *
- * How a block carries its hue depends on whether it leads:
+ * **On the field it is paper.** Warm off-white, an ink border, a hard offset behind it. The border
+ * is load-bearing there: it supplies the 3:1 non-text contrast that identifies a surface against a
+ * saturated field, which a translucent one could never guarantee.
  *
- *  - **[lead]** blocks take the hard chromatic plate offset 4dp behind them, and press by
- *    travelling exactly that far to land flush on it. This is the signature, and it is reserved for
- *    the one block a screen is actually about, plus anything that interrupts. Ten plates down a
- *    scroll is not ten emphases — it is a texture, and a loud one.
- *  - **everything else** takes the same hue as a rail inside the left edge, and a contact shadow
- *    instead of a plate. The semantics survive intact; the noise does not.
+ * **In a modal it is a pane.** Translucent, lit from the top-left, with a specular edge and a soft
+ * shadow — and no border and no hard offset at all. That is not a reskin, it is the correct answer
+ * to a different question. A hard offset is a shape casting a shadow onto the thing behind it, and
+ * inside a sheet the thing behind it is more glass; you get a black rectangle hanging in mid-air.
+ * A pane on glass is lit by the same light as the sheet holding it, which is what makes a stack of
+ * them read as one object with depth rather than as cards on a tray.
+ *
+ * How a block carries its hue is the same in both materials: [lead] blocks stand further off their
+ * background, and everything else takes the hue as a rail inside the left edge.
  */
 @Composable
 fun PaperBlock(
@@ -108,8 +112,20 @@ fun PaperBlock(
     // made it chromatic because a black shadow measured 1.38:1 on a near-black shell and could not
     // be seen. On a bright field a black shadow measures 10.59:1, and the canonical style puts one
     // under *everything* - that uniformity is the texture, rather than a thing to be rationed.
-    val offset = if (lead) HomeOsDims.plateOffsetLead else HomeOsDims.plateOffset
+    val onGlass = LocalOnGlass.current
+    val offset = when {
+        onGlass -> 0.dp
+        lead -> HomeOsDims.plateOffsetLead
+        else -> HomeOsDims.plateOffset
+    }
     val railed = plate != Plate.None
+    // A pane has nowhere to travel to, so it answers a press by brightening instead. The light on
+    // it is the whole of its modelling, so the light is what reacts.
+    val press by animateFloatAsState(
+        targetValue = if (pressed && !reduced) 1f else 0f,
+        animationSpec = Motion.effects(),
+        label = "blockPress",
+    )
 
     // Reduced motion keeps the press legible without moving anything: the block stays put and the
     // plate cross-fades out instead.
@@ -141,13 +157,15 @@ fun PaperBlock(
             // the screen whether or not a given block happens to lead.
             .padding(end = offset, bottom = offset),
     ) {
-        Box(
-            Modifier
-                .matchParentSize()
-                .plateOffset(offset)
-                .alpha(plateAlpha)
-                .background(colors.plateShadow, shape),
-        )
+        if (!onGlass) {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .plateOffset(offset)
+                    .alpha(plateAlpha)
+                    .background(colors.plateShadow, shape),
+            )
+        }
         Column(
             Modifier
                 .plateOffset(travel)
@@ -165,6 +183,14 @@ fun PaperBlock(
                         drawOutline(outline, focusRing, style = Stroke(ringWidth.toPx()))
                     }
                 }
+                // Deliberately no elevation shadow on a pane, which is the one thing that looked
+                // obvious and does not work. Android draws an elevation shadow as the blurred
+                // silhouette of the outline, and excludes the inside of it only for an opaque
+                // caster; a pane is translucent, so the shadow shows *through* it as a dark
+                // vignette inside the edges — which reads as a second, smaller rectangle nested
+                // in the first. Depth here comes from the light instead: the graded fill, the
+                // diagonal shine, the inner shade and the specular rim. The sheet is the object
+                // with elevation; the panes are inside it.
                 .clip(shape)
                 .then(
                     if (onClick != null) {
@@ -177,9 +203,15 @@ fun PaperBlock(
                         Modifier
                     },
                 )
-                // Flat. A gradient on a block is the one thing this style will not have: the
-                // fill is a single value and the only modelling anywhere is the hard offset.
-                .background(colors.paper, shape)
+                .then(
+                    if (onGlass) {
+                        Modifier.pane(shape, colors, lead, press)
+                    } else {
+                        // Flat. A gradient on a paper block is the one thing that style will not
+                        // have: the fill is a single value and the only modelling is the offset.
+                        Modifier.background(colors.paper, shape)
+                    },
+                )
                 .then(
                     if (railed) {
                         Modifier.drawBehind {
@@ -189,12 +221,76 @@ fun PaperBlock(
                         Modifier
                     },
                 )
-                .border(HomeOsDims.border, colors.border, shape)
+                .then(
+                    if (onGlass) Modifier else Modifier.border(HomeOsDims.border, colors.border, shape),
+                )
                 .padding(padding)
                 .then(if (railed) Modifier.padding(start = railWidth) else Modifier),
             verticalArrangement = verticalArrangement,
             content = content,
         )
+    }
+}
+
+/**
+ * The glass pane: fill, shine, inner shade and a specular edge, in one cached draw.
+ *
+ * Four layers, and each is answering something specific.
+ *
+ *  - **The fill is a gradient, not a value.** Glass is brighter where it faces the light. A flat
+ *    translucent rectangle is a tinted window; a graded one is a pane.
+ *  - **The shine is diagonal.** A vertical highlight reads as a gradient someone applied; a
+ *    diagonal one reads as a light source in the room, and it is the same top-left light the
+ *    sheet, the dock and every control are lit by.
+ *  - **The inner shade** at the foot is what gives the pane thickness. Without it the bottom edge
+ *    is just where the fill stops.
+ *  - **The edge is one stroke with four stops** — specular white at the top, nothing through the
+ *    middle, ink at the bottom. It is stroked at double width inside the clip, so the outer half
+ *    is thrown away and what survives is a crisp hairline hugging the inside of the curve. That
+ *    detail is the whole difference between glass and a translucent sticker.
+ *
+ * [press] brightens all of it, because on a pane the light is the only thing there is to move.
+ */
+private fun Modifier.pane(
+    shape: Shape,
+    colors: com.homeos.bridge.theme.HomeOsColors,
+    lead: Boolean,
+    press: Float,
+) = drawWithCache {
+    val outline = shape.createOutline(size, layoutDirection, this)
+    val edge = Stroke(HomeOsDims.glassEdge.toPx() * 2f)
+
+    // A leading pane is simply nearer the light.
+    val top = (if (lead) 0.64f else 0.54f) + 0.08f * press
+    val bottom = (if (lead) 0.44f else 0.36f) + 0.08f * press
+
+    val fill = Brush.verticalGradient(
+        0f to colors.paper.copy(alpha = top),
+        1f to colors.paper.copy(alpha = bottom),
+    )
+    val shine = Brush.linearGradient(
+        0.00f to colors.specular.copy(alpha = 0.40f + 0.14f * press),
+        0.26f to colors.specular.copy(alpha = 0.11f),
+        0.58f to Color.Transparent,
+        start = Offset.Zero,
+        end = Offset(size.width * 0.85f, size.height * 1.7f),
+    )
+    val shade = Brush.verticalGradient(
+        0.58f to Color.Transparent,
+        1.00f to colors.ink.copy(alpha = 0.07f),
+    )
+    val rim = Brush.verticalGradient(
+        0.00f to colors.specular.copy(alpha = 0.95f),
+        0.26f to colors.specular.copy(alpha = 0.26f),
+        0.74f to Color.Transparent,
+        1.00f to colors.ink.copy(alpha = 0.28f),
+    )
+
+    onDrawBehind {
+        drawOutline(outline, fill)
+        drawRect(shine)
+        drawRect(shade)
+        drawOutline(outline, rim, style = edge)
     }
 }
 
@@ -216,7 +312,15 @@ fun PaperAction(
     accent: Color? = null,
 ) {
     val colors = HomeOs.colors
-    val fill = accent?.copy(alpha = 0.20f)?.compositeOver(colors.paper) ?: colors.paperSunk
+    val onGlass = LocalOnGlass.current
+    // On glass the fill has to stay translucent or the control becomes the one opaque thing on a
+    // transparent pane, which is exactly the sticker problem one level further down.
+    val fill = when {
+        onGlass && accent != null -> accent.copy(alpha = 0.30f)
+        onGlass -> colors.paper.copy(alpha = 0.42f)
+        accent != null -> accent.copy(alpha = 0.20f).compositeOver(colors.paper)
+        else -> colors.paperSunk
+    }
 
     Row(
         modifier
@@ -224,7 +328,21 @@ fun PaperAction(
             .pressable(onClick = onClick, label = label)
             .clip(HomeOsShapes.pill)
             .background(fill, HomeOsShapes.pill)
-            .border(1.5.dp, colors.ink, HomeOsShapes.pill)
+            .then(
+                if (onGlass) {
+                    Modifier.border(
+                        HomeOsDims.glassEdge,
+                        Brush.verticalGradient(
+                            0.00f to colors.specular.copy(alpha = 0.85f),
+                            0.70f to Color.Transparent,
+                            1.00f to colors.ink.copy(alpha = 0.22f),
+                        ),
+                        HomeOsShapes.pill,
+                    )
+                } else {
+                    Modifier.border(1.5.dp, colors.ink, HomeOsShapes.pill)
+                },
+            )
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,

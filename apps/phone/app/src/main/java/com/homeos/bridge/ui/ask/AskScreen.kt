@@ -227,6 +227,8 @@ fun AskScreen(
                     onClick = send,
                     enabled = canSend,
                     filled = canSend,
+                    // The composer is dock-level glass, so its key is too.
+                    onGlass = true,
                     diameter = 44.dp,
                 )
             }

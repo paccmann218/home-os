@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
@@ -97,8 +98,15 @@ enum class GlassLevel(
      */
     Dock(blur = 40.dp, surfaceAlpha = 0.58f, sheen = 0.15f, rimTop = 0.14f, rimBottom = 0.04f, lift = 16.dp, hardBorder = false),
 
-    /** A sheet or dialog. Interrupts, so it floats highest. */
-    Sheet(blur = 46.dp, surfaceAlpha = 0.72f, sheen = 0.11f, rimTop = 0f, rimBottom = 0f, lift = 0.dp, hardBorder = true),
+    /**
+     * A sheet or dialog. Interrupts, so it floats highest — and it is the one surface where this
+     * app is glass all the way down rather than glass chrome around printed content.
+     *
+     * The heaviest blur and the lowest opacity of any sheet-like surface in the app, because what
+     * it is sitting on is a whole screen of the user's own content: the blur is doing real work
+     * there, where on the dock it is mostly blurring a gradient.
+     */
+    Sheet(blur = 56.dp, surfaceAlpha = 0.60f, sheen = 0.12f, rimTop = 0.10f, rimBottom = 0.03f, lift = 22.dp, hardBorder = false),
 }
 
 /**
@@ -109,6 +117,34 @@ enum class GlassLevel(
  * chrome look bolted on. Fading the material out over its last third removes the boundary entirely
  * and lets content slide under it the way it slides under a page gutter.
  */
+/**
+ * Whether the surfaces in this subtree are standing on glass.
+ *
+ * Modals set it. Everything that draws a surface reads it, and the whole of a sheet changes
+ * material without a single call site being touched — which is the point: the alternative was
+ * threading a boolean through every block, row and button in four screens, and whichever one got
+ * missed would be the one cream rectangle in a stack of glass.
+ *
+ * It is one flag rather than a second component set because the two materials hold the same
+ * content at the same sizes; only the way they catch light differs.
+ */
+val LocalOnGlass = staticCompositionLocalOf { false }
+
+/**
+ * The fill for an inset well — a chart plot, a range rail, a bar track — in whichever material
+ * this subtree is made of.
+ *
+ * On paper a well is *lighter* ink-free cream, because a recess in paper is a tint. On glass it is
+ * the opposite: a recess is where the glass is thicker, so it goes slightly darker, and it has to
+ * stay translucent or it becomes the one opaque patch on a transparent pane. An opaque cream well
+ * on a glass card is the detail that gives away a theme that was half converted.
+ */
+@Composable
+fun wellFill(): Color {
+    val colors = HomeOs.colors
+    return if (LocalOnGlass.current) colors.ink.copy(alpha = 0.09f) else colors.paperSunk
+}
+
 val GlassFadeDown: Brush = Brush.verticalGradient(
     0.00f to Color.Black,
     0.58f to Color.Black,
@@ -272,6 +308,15 @@ fun Modifier.frostedSurface(
     shape: Shape,
     selection: Float = 0f,
     accent: Color = HomeOs.colors.teal,
+    /**
+     * Whether this control sits on the field or on another piece of glass.
+     *
+     * On the field it takes the ink border, because it is standing among blocks that all have one
+     * and a chip without it would read as unfinished. On glass — inside the composer, inside the
+     * dock — it takes a specular edge instead, because a hard ink ring inside a soft translucent
+     * bar is the one hard thing in a soft area and it reads as a mistake rather than a hierarchy.
+     */
+    hard: Boolean = !LocalOnGlass.current,
 ): Modifier {
     val colors = HomeOs.colors
     if (!HomeOs.glass) {
@@ -288,7 +333,14 @@ fun Modifier.frostedSurface(
             val outline = shape.createOutline(size, layoutDirection, this)
             // Centred on the outline inside the clip, so the outer half is thrown away: stroked at
             // double width, what survives is a full-weight line hugging the edge.
-            val hard = Stroke(HomeOsDims.border.toPx() * 2f)
+            val hardStroke = Stroke(HomeOsDims.border.toPx() * 2f)
+            val edgeStroke = Stroke(HomeOsDims.glassEdge.toPx())
+            val edgeBrush = Brush.verticalGradient(
+                0.00f to colors.specular.copy(alpha = 0.95f),
+                0.30f to colors.specular.copy(alpha = 0.22f),
+                0.78f to Color.Transparent,
+                1.00f to colors.ink.copy(alpha = 0.22f),
+            )
 
             // Two corrections live in these two numbers.
             //
@@ -313,7 +365,11 @@ fun Modifier.frostedSurface(
             onDrawBehind {
                 drawOutline(outline, SolidColor(base))
                 drawRect(sheenBrush)
-                drawOutline(outline, SolidColor(colors.border), style = hard)
+                if (hard) {
+                    drawOutline(outline, SolidColor(colors.border), style = hardStroke)
+                } else {
+                    drawOutline(outline, edgeBrush, style = edgeStroke)
+                }
             }
         }
 }

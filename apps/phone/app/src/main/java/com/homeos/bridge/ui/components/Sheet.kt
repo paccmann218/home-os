@@ -31,6 +31,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -94,14 +95,19 @@ fun HomeOsSheet(
                             state = hazeState!!,
                             style = HazeStyle(
                                 backgroundColor = colors.shell,
-                                tint = HazeTint(colors.shellSunk.copy(alpha = 0.62f)),
-                                blurRadius = 18.dp,
-                                noiseFactor = 0.08f,
-                                fallbackTint = HazeTint(colors.shellSunk.copy(alpha = 0.86f)),
+                                // Lighter than it was, and blurred harder. The sheet in front of
+                                // it is 60% opaque now rather than 86%, so the page behind is
+                                // something you are meant to make out through the glass; at the
+                                // old density it was a dark brown wall and the transparency had
+                                // nothing to show.
+                                tint = HazeTint(colors.shellSunk.copy(alpha = 0.46f)),
+                                blurRadius = 26.dp,
+                                noiseFactor = 0.06f,
+                                fallbackTint = HazeTint(colors.shellSunk.copy(alpha = 0.76f)),
                             ),
                         )
                     } else {
-                        Modifier.background(colors.shellSunk.copy(alpha = 0.88f))
+                        Modifier.background(colors.shellSunk.copy(alpha = 0.80f))
                     },
                 )
                 .clickable(
@@ -126,6 +132,10 @@ fun HomeOsSheet(
                     .fillMaxWidth()
                     .heightIn(max = screenHeight - statusBars.calculateTopPadding() - 24.dp),
             ) {
+                // Everything from here down is glass: the blocks, their controls, the close
+                // key. One provider, so no screen has to know which material it is drawing on,
+                // and nothing can be missed and left as the single cream rectangle in the stack.
+                CompositionLocalProvider(LocalOnGlass provides true) {
                 Column(Modifier.fillMaxWidth()) {
                     // The grabber is the thing that says *this came up from the bottom and can go
                     // back down*. It is decorative as a control and essential as a signpost, which
@@ -144,9 +154,9 @@ fun HomeOsSheet(
                                 .background(
                                     Brush.horizontalGradient(
                                         listOf(
-                                            colors.onShell.copy(alpha = 0.22f),
-                                            colors.onShell.copy(alpha = 0.34f),
-                                            colors.onShell.copy(alpha = 0.22f),
+                                            colors.ink.copy(alpha = 0.10f),
+                                            colors.ink.copy(alpha = 0.26f),
+                                            colors.ink.copy(alpha = 0.10f),
                                         ),
                                     ),
                                 ),
@@ -178,13 +188,17 @@ fun HomeOsSheet(
                             .verticalScroll(rememberScrollState())
                             .padding(
                                 start = HomeOsDims.screenMargin,
-                                end = HomeOsDims.screenMargin - HomeOsDims.plateOffset,
+                                // The full margin on both sides: a pane reserves no room for a
+                                // hard offset, so the short end margin a paper block needs would
+                                // just read as the sheet being out of true.
+                                end = HomeOsDims.screenMargin,
                                 top = HomeOsDims.gutter,
                                 bottom = navBars.calculateBottomPadding() + 24.dp,
                             ),
                         verticalArrangement = Arrangement.spacedBy(HomeOsDims.gutter),
                         content = content,
                     )
+                }
                 }
             }
         }
