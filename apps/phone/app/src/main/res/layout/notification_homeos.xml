@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Collapsed notification content. The usable height here can be as little as 48dp on some
+    versions, so this is two lines and nothing else.
+
+    Colours are set explicitly rather than taken from the platform notification text appearances.
+    That is a deliberate departure from the usual advice, and it is safe for one reason: this view
+    brings its own opaque background, so the text is never on an unknown surface. What it buys is
+    that a HomeOS notification looks like HomeOS in a tray full of white cards.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/notif_card"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="13dp"
+    android:paddingTop="12dp"
+    android:paddingEnd="16dp"
+    android:paddingBottom="12dp">
+
+    <View
+        android:layout_width="3dp"
+        android:layout_height="match_parent"
+        android:layout_marginEnd="13dp"
+        android:minHeight="34dp"
+        android:background="@drawable/notif_rail" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/notif_kicker"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/inter_variable"
+            android:letterSpacing="0.14"
+            android:maxLines="1"
+            android:text="@string/notif_kicker_default"
+            android:textColor="@color/teal"
+            android:textSize="10sp" />
+
+        <TextView
+            android:id="@+id/notif_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:fontFamily="@font/inter_variable"
+            android:lineSpacingExtra="2dp"
+            android:maxLines="2"
+            android:textColor="@color/on_shell"
+            android:textSize="14sp" />
+    </LinearLayout>
+</LinearLayout>

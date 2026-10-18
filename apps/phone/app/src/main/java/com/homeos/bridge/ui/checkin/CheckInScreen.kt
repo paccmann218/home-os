@@ -23,8 +23,9 @@ import com.homeos.bridge.data.Condition
 import com.homeos.bridge.theme.HomeOs
 import com.homeos.bridge.theme.HomeOsDims
 import com.homeos.bridge.theme.Plate
+import com.homeos.bridge.theme.color
 import com.homeos.bridge.theme.ink
-import com.homeos.bridge.ui.components.ChipBlock
+import com.homeos.bridge.ui.components.GlassChip
 import com.homeos.bridge.ui.components.PaperBlock
 import com.homeos.bridge.ui.components.SectionHeader
 import com.homeos.bridge.ui.icons.HomeOsIcons
@@ -115,7 +116,7 @@ fun CheckInScreen(
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(
             start = HomeOsDims.screenMargin,
-            end = HomeOsDims.screenMargin,
+            end = HomeOsDims.screenMargin - HomeOsDims.plateOffset,
             top = contentPadding.calculateTopPadding() + 12.dp,
             bottom = contentPadding.calculateBottomPadding() + 24.dp,
         ),
@@ -127,7 +128,10 @@ fun CheckInScreen(
 
         item(key = "active") {
             if (active.isEmpty()) {
-                PaperBlock(plate = if (state.offline) Plate.Failure else Plate.None) {
+                PaperBlock(
+                    plate = if (state.offline) Plate.Failure else Plate.None,
+                    lead = state.offline,
+                ) {
                     Text(
                         // Not knowing and knowing-there-is-nothing are different claims, and only
                         // one of them is true when the home is unreachable.
@@ -160,11 +164,11 @@ fun CheckInScreen(
                     ) {
                         group.chips.forEach { chip ->
                             val isActive = active.any { it.kind == chip.key || it.implies.contains(chip.key) }
-                            ChipBlock(
+                            GlassChip(
                                 label = chip.label,
                                 icon = chip.icon,
-                                plate = group.plate,
                                 selected = isActive,
+                                accent = group.plate.color(colors),
                                 onClick = { onChip(chip.key) },
                             )
                         }

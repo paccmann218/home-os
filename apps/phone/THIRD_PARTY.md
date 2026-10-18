@@ -22,6 +22,20 @@ correct either way. Inter carries body text, labels, captions and **all inline n
 Fraunces has no tabular-figure feature and a live value set in it would shift width as it ticks.
 JetBrains Mono appears only in dev mode and on graph identifiers.
 
+**Where else the fonts appear.** The notification layouts in `app/src/main/res/layout/` set
+`android:fontFamily` to the same two bundled files, so a HomeOS notification is typeset like the
+app: Inter for the collapsed glance, Fraunces for the expanded card. RemoteViews are inflated with
+this package's resources, so no font is exported to the system.
+
+## The app mark
+
+`ic_launcher_background.xml`, `ic_launcher_foreground.xml`, `ic_launcher_monochrome.xml` and
+`ic_notification.xml` are **original work for this project** — hand-authored vector paths, not
+derived from any third-party icon set, and not generated from a template. The mark is one node with
+three joined to it: a household whose bodies are separate nodes and whose memory is a single graph.
+The three satellites take the three semantic hues from `theme/Color.kt`, so the icon and the
+interface speak the same vocabulary.
+
 ## Icons
 
 `app/src/main/java/com/homeos/bridge/ui/icons/HomeOsIcons.kt` holds SVG path data for 40 icons taken

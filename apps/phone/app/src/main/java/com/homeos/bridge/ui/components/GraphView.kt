@@ -110,13 +110,28 @@ private class Layout(val n: Int) {
 }
 
 /**
+ * The camera, in one place.
+ *
+ * These were two numbers in two functions and they did not agree: the renderer projected at 0.46
+ * of the short side and the hit test at 0.38, so every tap resolved against a picture 17 percent
+ * smaller than the one on screen. Near the middle it was close enough to look like it worked, and
+ * wrong by a node or two anywhere else. A projection has exactly one scale, so it is written once.
+ *
+ * The value allows for the layout squashing outliers out to 1.25 of the unit ball: 1.25 x 0.41 of
+ * the short side is just inside half the panel height, so a far component lands at the frame edge
+ * instead of being cut in half by it.
+ */
+private const val PROJECTION = 0.41f
+private const val FOCAL = 2.6f
+
+/**
  * Fruchterman-Reingold in three dimensions, run once off the main thread.
  *
  * Repulsion is the O(n^2) term and the reason `limit` matters: at 220 nodes that is ~24k pairs per
  * iteration, which finishes in well under a second. A Barnes-Hut tree would scale further and is
  * not worth the complexity for a graph that is bounded by a screen.
  */
-private fun layout(data: GraphData, iterations: Int = 180): Layout {
+private fun layout(data: GraphData, iterations: Int = 260): Layout {
     val n = data.nodes.size
     val l = Layout(n)
     if (n == 0) return l
@@ -208,15 +223,55 @@ private fun layout(data: GraphData, iterations: Int = 180): Layout {
     }
 
     // Normalise into a unit ball so the camera never has to be retuned per graph.
-    var maxR = 1e-5f
+    //
+    // The radius to divide by is a high *percentile*, not the maximum, and that distinction is the
+    // whole difference between a picture and a smudge. A real person graph has disconnected
+    // components - a stray Turn, an orphan Intervention - and Fruchterman-Reingold has nothing
+    // attracting a separate component back to the mass, so repulsion carries it out until the
+    // origin pull balances. Dividing by the maximum then hands the entire scale to that one
+    // outlier: it lands on the rim and everything that matters is squeezed into a clump in the
+    // middle, which is exactly what p01 looked like.
+    //
+    // So the bulk sets the scale, and anything past the ball is squashed asymptotically towards
+    // 1.25 instead of being clipped. Squashing rather than clamping keeps a far component
+    // readable as *far* rather than stacking every outlier on one shell.
+    // Recentre first. The origin pull keeps the mass *near* zero, not *on* it, and after the
+    // squash below a drift of a tenth of a radius is a graph visibly hanging off one corner of its
+    // viewport. Centroid rather than bounding box, so a far component shifts the frame a little
+    // instead of dragging it all the way out.
+    var mx = 0f
+    var my = 0f
+    var mz = 0f
     for (i in 0 until n) {
-        val r = sqrt(l.x[i] * l.x[i] + l.y[i] * l.y[i] + l.z[i] * l.z[i])
-        if (r > maxR) maxR = r
+        mx += l.x[i]
+        my += l.y[i]
+        mz += l.z[i]
     }
+    mx /= n
+    my /= n
+    mz /= n
     for (i in 0 until n) {
-        l.x[i] /= maxR
-        l.y[i] /= maxR
-        l.z[i] /= maxR
+        l.x[i] -= mx
+        l.y[i] -= my
+        l.z[i] -= mz
+    }
+
+    val radii = FloatArray(n) { i ->
+        sqrt(l.x[i] * l.x[i] + l.y[i] * l.y[i] + l.z[i] * l.z[i])
+    }
+    val pivot = radii.sorted()[((n - 1) * 0.88f).toInt()].coerceAtLeast(1e-5f)
+    for (i in 0 until n) {
+        l.x[i] /= pivot
+        l.y[i] /= pivot
+        l.z[i] /= pivot
+        val r = sqrt(l.x[i] * l.x[i] + l.y[i] * l.y[i] + l.z[i] * l.z[i])
+        if (r > 1f) {
+            val squashed = 1f + (1f - kotlin.math.exp(-(r - 1f))) * 0.25f
+            val f = squashed / r
+            l.x[i] *= f
+            l.y[i] *= f
+            l.z[i] *= f
+        }
     }
     return l
 }
@@ -312,8 +367,8 @@ fun GraphView(
 
             val cx = size.width / 2f
             val cyc = size.height / 2f
-            val scale = minOf(size.width, size.height) * 0.46f
-            val focal = 2.6f
+            val scale = minOf(size.width, size.height) * PROJECTION
+            val focal = FOCAL
 
             // A vignette turns the panel from a black hole into a lit viewport, and it darkens the
             // corners where far nodes land, which reinforces the depth cue rather than fighting it.
@@ -351,22 +406,30 @@ fun GraphView(
             val order = (0 until n).sortedByDescending { pz[it] }
 
             val (edgeFrom, edgeTo) = edgeIndex
+
+            // How much ink one edge is worth depends on how many there are. The same alpha that
+            // draws a 100-edge home graph as a legible lattice draws a 900-edge body graph as a
+            // wash, and the structure disappears under its own density.
+            val edgeInk = (260f / edgeFrom.size.coerceAtLeast(1)).coerceIn(0.40f, 1f)
+            val nodeScale = (90f / n).coerceIn(0.62f, 1f)
+
             for (e in edgeFrom.indices) {
                 val i = edgeFrom[e]
                 val j = edgeTo[e]
                 val depth = ((pr[i] + pr[j]) / 2f).coerceIn(0.4f, 1.6f)
-                val alpha = ((depth - 0.4f) / 1.2f).coerceIn(0.05f, 0.5f)
+                val alpha = ((depth - 0.4f) / 1.2f).coerceIn(0.06f, 0.55f)
                 drawLine(
-                    color = lerp(nodeColors[i], nodeColors[j], 0.5f).copy(alpha = alpha * 0.55f),
+                    color = lerp(nodeColors[i], nodeColors[j], 0.5f)
+                        .copy(alpha = alpha * 0.85f * edgeInk),
                     start = Offset(px[i], py[i]),
                     end = Offset(px[j], py[j]),
-                    strokeWidth = (0.9f * depth).dp.toPx(),
+                    strokeWidth = (0.85f * depth).dp.toPx(),
                 )
             }
 
             order.forEach { i ->
                 val depth = pr[i].coerceIn(0.4f, 1.6f)
-                val base = 3.2f + (l.degree[i].coerceAtMost(12)) * 0.42f
+                val base = (3.2f + (l.degree[i].coerceAtMost(12)) * 0.42f) * nodeScale
                 val radius = (base * depth).dp.toPx()
                 val color = nodeColors[i]
                 val near = ((depth - 0.4f) / 1.2f).coerceIn(0f, 1f)
@@ -404,14 +467,22 @@ fun GraphView(
                     return true
                 }
 
+                // One caption per distinct word. Most of p01 is sleep episodes, so without this
+                // the nearest fourteen nodes label themselves "sleep" eleven times, which tells a
+                // reader nothing they could not already see from the colour and costs the room
+                // where a Band or an Insight could have named itself.
+                val spoken = HashSet<String>()
+
                 order.asReversed()
                     .filter { pr[it] > 0.98f && l.degree[it] >= 2 }
-                    .take(14)
+                    .take(40)
                     .forEach { i ->
+                        if (placed.size >= 12) return@forEach
+                        if (!spoken.add(data.nodes[i].caption)) return@forEach
                         val measured = measurer.measure(data.nodes[i].caption, captionStyle)
                         val w = measured.size.width.toFloat()
                         val h = measured.size.height.toFloat()
-                        val radius = (3.2f + l.degree[i].coerceAtMost(12) * 0.42f) * pr[i]
+                        val radius = (3.2f + l.degree[i].coerceAtMost(12) * 0.42f) * nodeScale * pr[i]
                         val ox = px[i] + radius.dp.toPx() + 6f
                         val oy = py[i] - h / 2f
                         if (ox + w > size.width - 6f || oy < 4f || oy + h > size.height - 28f) return@forEach
@@ -465,8 +536,8 @@ private fun nearestNode(
     val sp = sin(pitch)
     val cx = width / 2f
     val cyc = height / 2f
-    val scale = minOf(width, height) * 0.38f
-    val focal = 2.6f
+    val scale = minOf(width, height) * PROJECTION
+    val focal = FOCAL
     var best = -1
     var bestD = Float.MAX_VALUE
     for (i in 0 until n) {

@@ -150,10 +150,13 @@ class HomeOsClient(private val baseUrl: () -> String) {
     /**
      * The whole subgraph for a person, or `home` for the shared one.
      *
-     * `limit` bounds how much comes back: p01 alone has 254 nodes and 1326 edges, which is more
-     * than a phone wants to lay out at 60fps.
+     * `limit` bounds the query by **paths**, not by nodes - the route is a `MATCH p=(a)-[r]->(b)
+     * ... LIMIT n`, so it caps edges and the node count falls out of whatever those edges touch.
+     * That is worth knowing before tuning it: 220 returned 61 of p01's 254 nodes, barely a quarter
+     * of the picture, and 900 returns 158. Beyond that the layout stops being legible on a phone
+     * long before it stops being fast.
      */
-    suspend fun graph(alias: String, limit: Int = 220): GraphData =
+    suspend fun graph(alias: String, limit: Int = 900): GraphData =
         GraphData.parse(JSONObject(get("/api/graph/$alias?limit=$limit")))
 
     suspend fun chip(alias: String, chip: String) {

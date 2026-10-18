@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The few palette values the platform needs from outside Compose: the window behind a cold start,
+    the splash background, and the notification card. Every one of them is a token that also exists
+    in theme/Color.kt and they have to stay in step — a window background one shade off its Compose
+    counterpart shows up as a flash on every single launch.
+-->
+<resources>
+    <color name="shell">#FF070F0F</color>
+    <color name="shell_raised">#FF141C1D</color>
+    <color name="shell_sunk">#FF030707</color>
+    <color name="on_shell">#FFE2EAEA</color>
+    <color name="on_shell_muted">#FF96A1A1</color>
+    <color name="teal">#FF60D3CD</color>
+    <color name="transparent">#00000000</color>
+</resources>

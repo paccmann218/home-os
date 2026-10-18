@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The mark: one node at the centre with three joined to it.
+
+    It is the product stated in the fewest shapes available — a household whose bodies are separate
+    nodes and whose memory is one graph. The three satellites take the three semantic hues, so the
+    icon and the interface are using the same vocabulary. Everything sits inside the 66dp safe
+    circle, so a round mask, a squircle and a tear-drop all crop to the same picture.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:pathData="M54,54 L54,32"
+        android:strokeColor="#D960D3CD"
+        android:strokeWidth="2.6"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M54,54 L73.05,65"
+        android:strokeColor="#A660D3CD"
+        android:strokeWidth="2.6"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M54,54 L34.95,65"
+        android:strokeColor="#A660D3CD"
+        android:strokeWidth="2.6"
+        android:strokeLineCap="round" />
+
+    <path android:pathData="M44.5,54a9.5,9.5 0 1,0 19,0a9.5,9.5 0 1,0 -19,0z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="44.5"
+                android:startY="44.5"
+                android:endX="63.5"
+                android:endY="63.5"
+                android:type="linear">
+                <item android:offset="0" android:color="#FF9FE9E4" />
+                <item android:offset="1" android:color="#FF3FB9B3" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <path
+        android:pathData="M48.5,32a5.5,5.5 0 1,0 11,0a5.5,5.5 0 1,0 -11,0z"
+        android:fillColor="#FFE2EAEA" />
+    <path
+        android:pathData="M67.55,65a5.5,5.5 0 1,0 11,0a5.5,5.5 0 1,0 -11,0z"
+        android:fillColor="#FFB6A2F3" />
+    <path
+        android:pathData="M29.45,65a5.5,5.5 0 1,0 11,0a5.5,5.5 0 1,0 -11,0z"
+        android:fillColor="#FFDDBA56" />
+</vector>
