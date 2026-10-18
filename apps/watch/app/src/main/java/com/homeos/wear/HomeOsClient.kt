@@ -1,9 +1,11 @@
 package com.homeos.wear
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.withTimeout
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -11,6 +13,8 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
@@ -57,6 +61,7 @@ class HomeOsClient(
 
     private val _events = MutableSharedFlow<Inbound>(extraBufferCapacity = 64, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val events: SharedFlow<Inbound> = _events.asSharedFlow()
+    private val demoWaiters = ConcurrentHashMap<String, CompletableDeferred<JSONObject>>()
 
     fun connect() {
         wantConnected.set(true)
@@ -88,6 +93,35 @@ class HomeOsClient(
     fun sendAsk(text: String) = send(JSONObject().put("type", "ask").put("text", text))
     fun sendAudio(wavBase64: String) = send(JSONObject().put("type", "audio").put("wav_base64", wavBase64))
     fun sendPromptAnswer(id: String, answer: String) = send(JSONObject().put("type", "prompt").put("id", id).put("answer", answer))
+
+    /** Sarvam TTS for the hardcoded alarm demo. Null when the backend has no audio yet. */
+    suspend fun demoSpeak(text: String, lang: String = "hi-IN"): String? {
+        if (!connected) return null
+        val reply = demoRoundtrip("demo_say", JSONObject().put("text", text).put("lang", lang), 25_000) ?: return null
+        return resolve(reply.optString("audio_url", ""))
+    }
+
+    /** Sarvam STT for the hardcoded alarm demo. Empty when nothing was heard. */
+    suspend fun demoHear(wavBase64: String): String {
+        if (!connected) return ""
+        val reply = demoRoundtrip("demo_hear", JSONObject().put("wav_base64", wavBase64), 20_000) ?: return ""
+        return reply.optString("text", "")
+    }
+
+    private suspend fun demoRoundtrip(type: String, extra: JSONObject, timeoutMs: Long): JSONObject? {
+        val id = UUID.randomUUID().toString()
+        val waiter = CompletableDeferred<JSONObject>()
+        demoWaiters[id] = waiter
+        extra.put("type", type).put("id", id)
+        send(extra)
+        return try {
+            withTimeout(timeoutMs) { waiter.await() }
+        } catch (_: Exception) {
+            null
+        } finally {
+            demoWaiters.remove(id)
+        }
+    }
 
     private fun send(j: JSONObject, quiet: Boolean = false) {
         val ws = socket
@@ -144,6 +178,7 @@ class HomeOsClient(
                         _events.tryEmit(Inbound.Prompt(j.optString("id"), j.optString("text"), List(opts.length()) { opts.getString(it) }))
                     }
                     "heard" -> _events.tryEmit(Inbound.Heard(j.optString("text")))
+                    "demo_audio", "demo_heard" -> demoWaiters.remove(j.optString("id"))?.complete(j)
                     "error" -> _events.tryEmit(Inbound.Error(j.optString("error")))
                 }
             } catch (e: Exception) {

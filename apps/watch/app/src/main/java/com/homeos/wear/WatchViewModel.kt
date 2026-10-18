@@ -6,18 +6,34 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
+import kotlin.coroutines.resume
 
 data class PromptUi(val id: String, val text: String, val options: List<String>)
+
+data class AlarmDemoUi(
+    val title: String,
+    val detail: String,
+    val listening: Boolean = false,
+    val done: Boolean = false,
+)
 
 data class WatchUi(
     val alias: String = BuildConfig.HOMEOS_ALIAS,
@@ -33,6 +49,7 @@ data class WatchUi(
     val pacerBpm: Double? = null,
     val pacerEndsAt: Long = 0,
     val serverVoice: Boolean = false,
+    val alarm: AlarmDemoUi? = null,
 )
 
 class WatchViewModel(app: Application) : AndroidViewModel(app) {
@@ -41,6 +58,9 @@ class WatchViewModel(app: Application) : AndroidViewModel(app) {
     private val pacer = Pacer(app)
     private var tts: TextToSpeech? = null
     private var lastHrSent = 0L
+    private var demoStarted = false
+    private var demoJob: Job? = null
+    private val confirm = Channel<Boolean>(Channel.BUFFERED)
 
     private val _ui = MutableStateFlow(WatchUi())
     val ui: StateFlow<WatchUi> = _ui.asStateFlow()
@@ -56,7 +76,7 @@ class WatchViewModel(app: Application) : AndroidViewModel(app) {
                     is Inbound.Connected -> _ui.update { it.copy(connected = true, status = "Connected as ${client.alias}") }
                     is Inbound.Disconnected -> _ui.update { it.copy(connected = false, status = "Reconnecting…") }
                     is Inbound.Hello -> _ui.update { it.copy(serverVoice = e.voice) }
-                    is Inbound.Say -> onSay(e)
+                    is Inbound.Say -> if (_ui.value.alarm == null) onSay(e)
                     is Inbound.Pacer -> startPacer(e.bpm, e.seconds)
                     is Inbound.Prompt -> _ui.update { it.copy(prompt = PromptUi(e.id, e.text, e.options)) }.also { pacer.stop(); buzz() }
                     is Inbound.Heard -> _ui.update { it.copy(heard = e.text) }
@@ -93,6 +113,10 @@ class WatchViewModel(app: Application) : AndroidViewModel(app) {
         hr.start()
         val samsung = ibi.start()
         _ui.update { it.copy(ibi = samsung) }
+        if (!demoStarted) {
+            demoStarted = true
+            replayAlarmDemo()
+        }
     }
 
     fun stop() {
@@ -130,11 +154,157 @@ class WatchViewModel(app: Application) : AndroidViewModel(app) {
     /** Server-side Sarvam STT: record a WAV, send it on the second tap. */
     fun toggleRecording() {
         if (!_ui.value.recording) {
-            if (audio.startRecording()) _ui.update { it.copy(recording = true, status = "Listening… tap to send") }
+            if (audio.startRecording()) _ui.update { it.copy(recording = true, status = "Listening…") }
         } else {
             val b64 = audio.stopRecordingToWavBase64()
             _ui.update { it.copy(recording = false, thinking = b64 != null, status = if (b64 != null) "Thinking…" else "Didn't catch that") }
             if (b64 != null) client.sendAudio(b64)
+        }
+    }
+
+    /** Spoken yes, or the on-screen Yes button. */
+    fun confirmAlarm() {
+        confirm.trySend(true)
+    }
+
+    fun declineAlarm() {
+        confirm.trySend(false)
+    }
+
+    fun dismissAlarmDemo() {
+        demoJob?.cancel()
+        tts?.stop()
+        audio.speechEndpoint = null
+        if (_ui.value.recording) audio.stopRecordingToWavBase64()
+        _ui.update { it.copy(alarm = null, recording = false, thinking = false) }
+    }
+
+    fun replayAlarmDemo() {
+        demoJob?.cancel()
+        tts?.stop()
+        audio.speechEndpoint = null
+        if (_ui.value.recording) audio.stopRecordingToWavBase64()
+        demoJob = viewModelScope.launch {
+            delay(700)
+            runAlarmDemo()
+        }
+    }
+
+    private suspend fun runAlarmDemo() {
+        val ready = System.currentTimeMillis() + 3500
+        while (!client.connected && System.currentTimeMillis() < ready) delay(150)
+        showAlarm("Tomorrow 8:00 AM", "Short sleep")
+        for (line in AlarmScript.intro) speakDemo(line)
+        var tries = 0
+        var accepted = false
+        while (tries < 2 && !accepted) {
+            showAlarm("Set alarms?", "6:00 and 6:30 AM", listening = true)
+            when (listenForAnswer()) {
+                true -> accepted = true
+                false -> {
+                    showAlarm("Cancelled", "")
+                    speakDemo(AlarmScript.DECLINE)
+                    return
+                }
+                null -> {
+                    tries++
+                    if (tries < 2) speakDemo(AlarmScript.CLARIFY)
+                }
+            }
+        }
+        if (!accepted) {
+            showAlarm("Stopped", "")
+            return
+        }
+        showAlarm("Creating the task", "")
+        speakDemo(AlarmScript.WORKING)
+        showAlarm("Setting the clock", "6:00 and 6:30 AM")
+        delay(2000)
+        showAlarm("Alarms set", "6:00 AM · 6:30 AM", done = true)
+        speakDemo(AlarmScript.DONE)
+    }
+
+    private fun showAlarm(title: String, detail: String, listening: Boolean = false, done: Boolean = false) {
+        _ui.update {
+            it.copy(
+                alarm = AlarmDemoUi(title, detail, listening, done),
+                status = title,
+                thinking = false,
+            )
+        }
+    }
+
+    private suspend fun listenForAnswer(): Boolean? = coroutineScope {
+        while (confirm.tryReceive().isSuccess) Unit
+        val endpoint = CompletableDeferred<Unit>()
+        audio.speechEndpoint = { if (!endpoint.isCompleted) endpoint.complete(Unit) }
+        val started = audio.startRecording()
+        _ui.update { it.copy(recording = started, heard = "", status = "Listening…") }
+        val winner = CompletableDeferred<String>()
+        val tapJob = launch {
+            val tap = confirm.receive()
+            winner.complete(if (tap) "yes" else "no")
+        }
+        val voiceJob = launch {
+            if (started) withTimeoutOrNull(8_000) { endpoint.await() } else delay(12_000)
+            winner.complete("voice")
+        }
+        val how = winner.await()
+        tapJob.cancel()
+        voiceJob.cancel()
+        audio.speechEndpoint = null
+        if (!started && how == "voice") {
+            _ui.update { it.copy(recording = false) }
+            return@coroutineScope null
+        }
+        if (how == "yes" || how == "no") {
+            audio.stopRecordingToWavBase64()
+            _ui.update { it.copy(recording = false) }
+            return@coroutineScope how == "yes"
+        }
+        val wav = audio.stopRecordingToWavBase64()
+        _ui.update { it.copy(recording = false, thinking = true, status = "Listening…") }
+        if (wav.isNullOrBlank()) return@coroutineScope null
+        val text = runCatching { client.demoHear(wav) }.getOrDefault("")
+        _ui.update { it.copy(heard = text, thinking = false) }
+        return@coroutineScope interpretAlarmAnswer(text)
+    }
+
+    private suspend fun speakDemo(text: String) {
+        _ui.update { it.copy(thinking = true, status = "Speaking…") }
+        val url = runCatching { client.demoSpeak(text) }.getOrNull()
+        val played = if (!url.isNullOrBlank()) {
+            runCatching { audio.playUrl(url) }.onFailure { Log.w("HomeOS", "demo tts: ${it.message}") }.isSuccess
+        } else {
+            false
+        }
+        if (!played) deviceSpeak(text)
+        _ui.update { it.copy(thinking = false) }
+    }
+
+    private suspend fun deviceSpeak(text: String) = suspendCancellableCoroutine { cont ->
+        val engine = tts
+        if (engine == null) {
+            cont.resume(Unit)
+            return@suspendCancellableCoroutine
+        }
+        engine.language = Locale("hi", "IN")
+        val id = "alarm-${System.nanoTime()}"
+        engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {}
+            override fun onDone(utteranceId: String?) {
+                if (utteranceId == id && cont.isActive) cont.resume(Unit)
+            }
+            @Deprecated("Deprecated in Java")
+            override fun onError(utteranceId: String?) {
+                if (utteranceId == id && cont.isActive) cont.resume(Unit)
+            }
+            override fun onError(utteranceId: String?, errorCode: Int) {
+                if (utteranceId == id && cont.isActive) cont.resume(Unit)
+            }
+        })
+        if (engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, id) == TextToSpeech.ERROR && cont.isActive) {
+            cont.resume(Unit)
         }
     }
 
@@ -159,6 +329,7 @@ class WatchViewModel(app: Application) : AndroidViewModel(app) {
     private fun buzz() = runCatching { Pacer(getApplication()).start(30.0, 1) }
 
     override fun onCleared() {
+        demoJob?.cancel()
         runCatching { connectivity.unregisterNetworkCallback(wifiCallback) }
         stop()
         client.disconnect()
