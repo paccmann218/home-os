@@ -1,13 +1,14 @@
 # HomeOS: a home with a nervous system
 
-**Team Rocket** — Naomi, Harshendra, and Shashwath.
-**Graph Hacks 2026** (WeMakeDevs × FalkorDB). Track 1, Agents That Act on Connected Data. Track 2, Agent Memory and Coordination.
+[**Live site**](https://main.d11a55m87k52ya.amplifyapp.com/) · [**Demo video**](https://www.youtube.com/watch?v=Et2mwpHbiZY)
+
+Graph Hacks 2026, WeMakeDevs × FalkorDB. Track 1 and Track 2.
 
 Your ring already knows you slept badly. Your calendar already knows you have an 8am. Your house knows neither, so it sits there. HomeOS puts both facts in FalkorDB and lets agents walk the edges. The action, and the explanation, come back as a path.
 
 Each person has a private graph. The home has one shared graph that receives a temperature range and a priority, never the reason. Ask the watch why, and the answer is that path. Take FalkorDB out and the same scene cannot explain itself. That comparison is in [the ablation](#proof-the-graph-is-load-bearing-ablation).
 
-> [Live site](https://main.d11a55m87k52ya.amplifyapp.com/) · [Demo video](https://www.youtube.com/watch?v=Et2mwpHbiZY) · Dashboard `http://localhost:3001` · FalkorDB Browser `http://localhost:3000` · [Setup, debug, and run](docs/SETUP.md) · [Track 1](docs/TRACK1.md) · [Track 2](docs/TRACK2.md) · [Who did what](#who-did-what) · [License](LICENSE)
+Dashboard `http://localhost:3001` · FalkorDB Browser `http://localhost:3000` · [Setup, debug, and run](docs/SETUP.md) · [Track 1](docs/TRACK1.md) · [Track 2](docs/TRACK2.md) · [Who did what](#who-did-what) · [License](LICENSE)
 
 The model never writes Cypher. People wrote the queries in [`graph/queries/`](graph/queries). The model picks a tool, over MCP, and fills parameters that are checked before anything runs. Writes go through one typed API. An empty traversal is said out loud as an empty traversal.
 
