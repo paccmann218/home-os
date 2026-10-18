@@ -71,9 +71,12 @@ val LocalHazeState = staticCompositionLocalOf<HazeState?> { null }
 
 // The light's own colour, not the field's. Cool at 20 C and below, warm at 29 and above, and
 // close to colourless in between, so an ordinary room does not look like it is on fire.
-internal val AmbientCool = Color(0xFF6FA8FF) //  20 C and below
-internal val AmbientNeutral = Color(0xFFBFEAE6) //  23 C
-internal val AmbientWarm = Color(0xFFFFB166) //  29 C and above
+// Pulled a long way down in chroma from the versions that sat on a cool field. Over a warm ground
+// a saturated blue does not read as cool light, it reads as mud: the two hues are near opposite and
+// what they average to is grey. These are tints of the same light instead of separate colours.
+internal val AmbientCool = Color(0xFF9FC4E8) //  20 C and below
+internal val AmbientNeutral = Color(0xFFF7E6CC) //  23 C
+internal val AmbientWarm = Color(0xFFFFBE7A) //  29 C and above
 
 /**
  * Hue follows temperature.
@@ -194,38 +197,46 @@ private fun Modifier.ambient(ambience: Ambience): Modifier = composed {
         drawRect(colors.shell)
 
         // 2. the dot grid, at the strength of a texture and not of a pattern
-        drawRect(brush = dots, alpha = 0.16f)
+        drawRect(brush = dots, alpha = 0.13f)
 
-        // 3. the light, behind and above, falling away toward the front
+        // 3. the light, behind and above, falling away toward the front.
+        //
+        // The bloom is [shellBloom] rather than white, and that is the whole difference between a
+        // background that looks lit and one that looks like a colour with a white gradient over
+        // it. White desaturates whatever it crosses, so a white bloom on a warm field washes a
+        // pale grey hole through the middle of every screen; a bloom in the field's own family at
+        // a higher lightness is simply more of the same light.
         drawRect(
             brush = Brush.radialGradient(
-                0.00f to Color.White.copy(alpha = 0.92f * lit),
-                0.30f to Color.White.copy(alpha = 0.46f * lit),
-                0.62f to Color.White.copy(alpha = 0.14f * lit),
+                0.00f to colors.shellBloom.copy(alpha = 0.96f * lit),
+                0.34f to colors.shellBloom.copy(alpha = 0.62f * lit),
+                0.68f to colors.shellBloom.copy(alpha = 0.18f * lit),
                 1.00f to Color.Transparent,
-                center = Offset(w * (0.28f + 0.14f * phaseA), h * (-0.10f + 0.08f * phaseB)),
-                radius = maxOf(w, h) * 0.78f,
+                center = Offset(w * (0.30f + 0.14f * phaseA), h * (-0.12f + 0.08f * phaseB)),
+                radius = maxOf(w, h) * 0.86f,
             ),
         )
         // The room's own colour, carried by the light rather than by the field, so the field stays
-        // the one flat constant and the temperature is still legible before any number is read.
+        // the one constant and the temperature is still legible before any number is read.
         drawRect(
             brush = Brush.radialGradient(
-                0.00f to tint.copy(alpha = 0.30f * lit),
+                0.00f to tint.copy(alpha = 0.22f * lit),
                 1.00f to Color.Transparent,
                 center = Offset(w * (0.78f - 0.12f * phaseB), h * (0.12f + 0.06f * phaseA)),
                 radius = maxOf(w, h) * 0.70f,
             ),
         )
-        // 4. and the front falls into shadow, which is what gives the field a direction
+        // 4. and the front falls away, which is what gives the field a direction. Into
+        // [shellDeep] rather than into ink: a black wash over a warm colour greys it, and the
+        // bottom third of every screen came out the colour of wet cardboard.
         drawRect(
             brush = Brush.verticalGradient(
-                0.40f to Color.Transparent,
-                1.00f to colors.ink.copy(alpha = 0.30f),
+                0.34f to Color.Transparent,
+                1.00f to colors.shellDeep.copy(alpha = 0.92f),
             ),
         )
 
-        drawRect(brush = grain, alpha = 0.035f, blendMode = BlendMode.Plus)
+        drawRect(brush = grain, alpha = 0.03f, blendMode = BlendMode.Plus)
     }
 }
 

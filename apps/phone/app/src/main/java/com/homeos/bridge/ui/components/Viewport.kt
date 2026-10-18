@@ -88,11 +88,15 @@ fun Viewport(
                         ),
                     )
                 } else {
+                    // Sky in the field's own light rather than in white. At 0.42 of white the
+                    // stage came out the same value as the model standing on it, and a cream
+                    // house on a cream stage has no silhouette — which is the one thing the
+                    // daylit variant exists to give it.
                     drawRect(
                         Brush.verticalGradient(
-                            0.00f to colors.specular.copy(alpha = 0.42f),
-                            0.62f to Color.Transparent,
-                            1.00f to colors.ink.copy(alpha = 0.14f),
+                            0.00f to colors.shellBloom.copy(alpha = 0.55f),
+                            0.58f to Color.Transparent,
+                            1.00f to colors.ink.copy(alpha = 0.11f),
                         ),
                     )
                 }
@@ -105,11 +109,16 @@ fun Viewport(
     ) {
         content()
 
+        // Both labels sit on whichever backdrop this window is, and the two backdrops are at
+        // opposite ends of the ramp — so a single token for them was legible on neither. Dark
+        // ink on the shaded foot of the daylit stage was the worse of the two.
+        val onWindow = if (dark) colors.paper.copy(alpha = 0.70f) else colors.ink.copy(alpha = 0.82f)
+
         hint?.let {
             Text(
                 it,
                 style = type.micro,
-                color = colors.onShellMuted,
+                color = onWindow,
                 modifier = Modifier.align(Alignment.BottomStart).padding(12.dp),
             )
         }
@@ -117,7 +126,7 @@ fun Viewport(
             Text(
                 it,
                 style = type.monoMicro,
-                color = colors.onShellMuted,
+                color = onWindow,
                 modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp),
             )
         }

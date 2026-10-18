@@ -77,11 +77,13 @@ class HomeOsColors(
     /**
      * The hard offset behind a block.
      *
-     * Black, which is the canonical choice and was impossible in every previous version of this
-     * design: on a near-black shell it measured 1.38:1, which is why those versions reached for
-     * chromatic plates instead. On a bright field it measures 10.59:1 and needs no apology.
+     * Espresso rather than pure black, and that is the single change that pulls the style back
+     * from cartoon. Canonical neobrutalism uses #000, which on a saturated field reads as a
+     * sticker outline; a very dark warm brown is the same shape at the same weight and belongs to
+     * the same light as the field, so it reads as a shadow something is casting. It measures
+     * 7.98:1, so nothing is given up for it.
      */
-    val plateShadow: Color get() = Color(0xFF0A0C0D)
+    val plateShadow: Color get() = Color(0xFF2A1E14)
 
     /** Highlights on glass. White, because the glass now sits on a light field. */
     val specular: Color get() = Color.White
@@ -90,40 +92,82 @@ class HomeOsColors(
      * The daylit stage the 3D house stands in: the field, two steps deeper.
      *
      * Deeper rather than lighter because the model's walls are [paper], and a cream model on a
-     * cream stage has no silhouette at all. This keeps 2.2:1 under the walls while still reading
+     * cream stage has no silhouette at all. This keeps 3.03:1 under the walls while still reading
      * as the same material as the rest of the app.
      */
-    val well: Color get() = Color(0xFF3FB3AA)
+    val well: Color get() = Color(0xFFB8894F)
+
+    /**
+     * The light at the back of the field, and the shadow at the front.
+     *
+     * The field is not one colour. It is a warm light behind the interface, falling away toward
+     * the viewer, and these are its two ends: [shellBloom] where the light is, [shellDeep] where
+     * it has gone. Both come from the same warm family as [shell], so the gradient is a change in
+     * illumination rather than a change in hue — which is the difference between a background that
+     * reads as lit and one that reads as a colour picker.
+     */
+    val shellBloom: Color get() = Color(0xFFFCE4C6)
+    val shellDeep: Color get() = Color(0xFFD98F44)
+
+    /**
+     * The selection lens: the pill that marks the current tab or segment, and the wordmark.
+     *
+     * Burnt sienna with [onLens] reversed out of it — the field's own hue taken down to a tone
+     * dark enough to carry text, rather than a separate colour introduced to mark a selection.
+     *
+     * It replaced a pastel mint capsule, which was the single most sweet-shop object the interface
+     * owned and the last thing on screen still reading as a toy after the field turned warm. A
+     * dark pill was going to be the answer either way; making it the dark end of the field means
+     * the app now runs on exactly one hue, which is what reads as considered rather than decorated.
+     *
+     * Measured both ways round, because it is used both ways: [onLens] on the pill is 6.13:1, and
+     * the pill — or the wordmark — against the field is 3.11:1, clearing the 3:1 floor for a large
+     * mark with no room to spare, which is why it is this tone and not a lighter one.
+     */
+    val lens: Color get() = Color(0xFF9C4713)
+    val onLens: Color get() = paper
 }
 
 /** oklch(L C H) -> sRGB, gamut-mapped. See theme docs for the audit. */
 val HomeOsPalette = HomeOsColors(
-    // The field. Bold, flat and light, because that is what makes the style read as the style:
-    // a black border and a hard black shadow need something bright to be hard against, and on a
-    // near-black background they measured 1.38:1 and vanished. Here they measure 10.59:1.
-    shell        = Color(0xFF5EC9C0),
-    shellRaised  = Color(0xFFF4F1ED), // glass tint, dev surface
-    surfaceHi    = Color(0xFFEAE8E3), // wells inside a block
-    overlay      = Color(0xFFF7F5F2), // sheets
-    // The dark well the two 3D views are windows onto. The only dark surface left.
-    shellSunk    = Color(0xFF0B1012),
-    onShell      = Color(0xFF131719), //  9.10:1 on the field
-    onShellMuted = Color(0xFF3F4347), //  6.22:1 on the field
-    onShellFaint = Color(0xFF5A5F64), //  4.51:1 on the field
+    // The field: warm apricot, lit from behind. Sampled from the reference it was chosen against,
+    // whose three bands are this, [shellBloom] and [shellDeep].
+    //
+    // The hue moved from cyan to apricot for one reason, worth writing down because it is the
+    // fourth time this palette has been rebuilt. A saturated cyan field under cream blocks is a
+    // *toy* palette: high chroma, cool, and the single combination every generated interface
+    // reaches for. A warm field at the same lightness is what print has used for a century.
+    // Nothing structural changed here — the app simply stopped looking like a plastic object.
+    //
+    // The lightness did not move, because three jobs depend on it: ink at 8.65:1, a block raised
+    // at 1.97:1, and the hard shadow at 7.98:1.
+    shell        = Color(0xFFEDA85C),
+    shellRaised  = Color(0xFFFFFBF5), // glass tint, dev surface
+    surfaceHi    = Color(0xFFF3EADD), // wells inside a block
+    overlay      = Color(0xFFFFFCF7), // sheets
+    // The dark well the two 3D views are windows onto. The only dark surface left, and warm now
+    // as well, so the graph reads as a lit screen rather than a hole cut in the page.
+    shellSunk    = Color(0xFF120E0B),
+    onShell      = Color(0xFF1E1813), //  8.65:1 on the field
+    onShellMuted = Color(0xFF4A423A), //  4.85:1 on the field
+    onShellFaint = Color(0xFF655A50), //  3.30:1 on the field
 
     // Blocks, and the hardest line on screen. The same two colours do double duty as the 3D
     // renderer's materials, which is why the walls of the model are literally the app's paper and
     // the cut through the top of them is literally its ink.
-    paper        = Color(0xFFF4F1ED), // block fill, and the walls of the room
-    paperSunk    = Color(0xFFEAE8E3), // wells, and the shaded face of a wall
-    ink          = Color(0xFF131719), // borders, body text, and the cut through a wall
-    inkMuted     = Color(0xFF4F5357),
+    paper        = Color(0xFFFFFBF5), // block fill, and the walls of the room
+    paperSunk    = Color(0xFFF3EADD), // wells, and the shaded face of a wall
+    ink          = Color(0xFF1E1813), // borders, body text, and the cut through a wall
+    inkMuted     = Color(0xFF4A423A),
 
-    teal      = Color(0xFF60D3CD), tealInk   = Color(0xFF0B625E), // 10.83:1 shell / 6.37:1 paper
-    violet    = Color(0xFFB6A2F3), violetInk = Color(0xFF543A8B), //  8.73:1 shell / 7.96:1 paper
-    amber     = Color(0xFFDDBA56), amberInk  = Color(0xFF7C550F), // 10.35:1 shell / 5.92:1 paper
-    red       = Color(0xFFF56F57), redInk    = Color(0xFFA32418), //  6.75:1 shell / 6.61:1 paper
-    green     = Color(0xFF67CFA5), greenInk  = Color(0xFF0B6548), // 10.17:1 shell / 6.31:1 paper
+    // The hues themselves are unchanged. They read warmer without being re-picked, because every
+    // one of them now sits on a warm ground — and because the bright tones stopped being used as
+    // slabs (see the blend in `frostedSurface`), which is what made a row of them read as sweets.
+    teal      = Color(0xFF60D3CD), tealInk   = Color(0xFF0B625E), // 1.13:1 field / 6.97:1 paper
+    violet    = Color(0xFFB6A2F3), violetInk = Color(0xFF543A8B), // 1.10:1 field / 8.32:1 paper
+    amber     = Color(0xFFDDBA56), amberInk  = Color(0xFF7C550F), // 1.09:1 field / 6.44:1 paper
+    red       = Color(0xFFF56F57), redInk    = Color(0xFFA32418), // 1.42:1 field / 7.07:1 paper
+    green     = Color(0xFF67CFA5), greenInk  = Color(0xFF0B6548), // 1.11:1 field / 6.89:1 paper
 
     stageAwake = Color(0xFFAD7C2F), //  3.01:1 on paperSunk
     stageRem   = Color(0xFF6A51A4), //  5.14:1

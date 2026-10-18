@@ -421,11 +421,18 @@ fun buildMesh(plan: RoomPlan, detailMax: Int = 2): RoomMesh {
 private const val PLANK = 0.2f
 private const val UNCONNECTED_DIM = 0.68f
 
-/** `paper`, from the app's own palette. The walls of the room are the app's paper. */
-private const val WALL_BODY = 0xFFF4F1ED.toInt()
-
-/** `ink`. */
-private const val WALL_CAP = 0xFF131719.toInt()
+/**
+ * `paper` and `ink`, from the app's own palette: the walls of the room are literally the app's
+ * paper and the cut through the top of them is literally its ink. That is the detail that makes
+ * the renderer belong to this app rather than look pasted in from another one.
+ *
+ * Duplicated as literals because they are baked into a build-time shading LUT, which runs off the
+ * main thread before any composition is in scope. **They have to move when `theme/Color.kt` moves**
+ * — they were left behind once already, when the palette turned warm and the model kept a pair of
+ * cool greys nobody could place.
+ */
+private const val WALL_BODY = 0xFFFFFBF5.toInt()
+private const val WALL_CAP = 0xFF1E1813.toInt()
 
 private const val FIXTURE_BODY = 0xFF8D8F96.toInt()
 

@@ -23,16 +23,17 @@ object HomeOsShapes {
 
 object HomeOsDims {
     /**
-     * 3dp. The weight is the style, and 2dp was under-reading at phone density against a bright
-     * field - the border has to be the hardest thing on screen or none of this works.
+     * 2.5dp. Half a point down from 3, which sounds like nothing and is most of the difference
+     * between a printed rule and a drawn outline. The weight still has to be the hardest thing on
+     * screen; it does not have to look like a marker pen.
      */
-    val border = 3.dp
+    val border = 2.5.dp
 
     /** The hard offset. A pressed block travels exactly this far and lands flush on it. */
-    val plateOffset = 6.dp
+    val plateOffset = 5.dp
 
     /** The lead block on a screen stands further off the field. */
-    val plateOffsetLead = 9.dp
+    val plateOffsetLead = 7.dp
 
     /**
      * The accent rail: how a supporting block carries its hue without a second hard offset.
@@ -41,7 +42,7 @@ object HomeOsDims {
      * is actually about. Ten plates stacked down a scroll is not ten emphases, it is none — so
      * every other block keeps the same semantic colour as a bar inside its left edge.
      */
-    val rail = 5.dp
+    val rail = 4.dp
 
     val screenMargin = 16.dp
     val gutter = 12.dp

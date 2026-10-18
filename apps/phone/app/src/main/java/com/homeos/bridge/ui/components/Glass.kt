@@ -76,16 +76,29 @@ enum class GlassLevel(
     val hardBorder: Boolean,
 ) {
     /** A chip, a tile, a small control. Tint only — see the note on blur above. */
-    Control(blur = 0.dp, surfaceAlpha = 0.74f, sheen = 0.055f, rimTop = 0.24f, rimBottom = 0.06f, lift = 0.dp, hardBorder = false),
+    Control(blur = 0.dp, surfaceAlpha = 0.58f, sheen = 0.075f, rimTop = 0.24f, rimBottom = 0.06f, lift = 0.dp, hardBorder = false),
 
     /** The top bar. It should recede, so it carries no rim and dissolves downward. */
-    Chrome(blur = 24.dp, surfaceAlpha = 0.72f, sheen = 0.05f, rimTop = 0f, rimBottom = 0f, lift = 0.dp, hardBorder = false),
+    Chrome(blur = 30.dp, surfaceAlpha = 0.55f, sheen = 0.09f, rimTop = 0f, rimBottom = 0f, lift = 0.dp, hardBorder = false),
 
-    /** The floating dock: the most object-like surface in the app, so it is lit the hardest. */
-    Dock(blur = 26.dp, surfaceAlpha = 0.80f, sheen = 0.06f, rimTop = 0f, rimBottom = 0f, lift = 0.dp, hardBorder = true),
+    /**
+     * The floating dock.
+     *
+     * The one surface in the app that is glass rather than a block, and the only one that earns
+     * the exception: it is the thing that stays while every screen moves underneath it, so it has
+     * to look like it is *above* the page rather than printed on it. A 2.5dp ink border and a hard
+     * offset said the opposite — that it was one more block, the loudest one, parked over the
+     * content. It read as a sticker.
+     *
+     * So: no hard border, a soft shadow instead of a hard one, the lowest opacity in the app, and
+     * the heaviest blur. What marks its edge is the bevel in [glassLight] — a white specular line
+     * at the top falling to an ink hairline at the bottom — which is what the eye actually reads as
+     * the thickness of a piece of glass.
+     */
+    Dock(blur = 40.dp, surfaceAlpha = 0.58f, sheen = 0.15f, rimTop = 0.14f, rimBottom = 0.04f, lift = 16.dp, hardBorder = false),
 
     /** A sheet or dialog. Interrupts, so it floats highest. */
-    Sheet(blur = 32.dp, surfaceAlpha = 0.86f, sheen = 0.055f, rimTop = 0f, rimBottom = 0f, lift = 0.dp, hardBorder = true),
+    Sheet(blur = 46.dp, surfaceAlpha = 0.72f, sheen = 0.11f, rimTop = 0f, rimBottom = 0f, lift = 0.dp, hardBorder = true),
 }
 
 /**
@@ -135,7 +148,7 @@ fun GlassSurface(
                 backgroundColor = colors.shell,
                 tint = HazeTint(colors.shellRaised.copy(alpha = level.surfaceAlpha)),
                 blurRadius = level.blur,
-                noiseFactor = 0.12f,
+                noiseFactor = 0.06f,
                 // If the platform refuses to blur, a solid scrim is the only honest fallback; a
                 // thin tint over unblurred content would be unreadable.
                 fallbackTint = HazeTint(colors.shellRaised),
@@ -227,10 +240,10 @@ private fun Modifier.glassLight(
         1.00f to if (faded) Color.Transparent else colors.ink.copy(alpha = 0.06f),
     )
     val bevel = Brush.verticalGradient(
-        0.00f to colors.specular.copy(alpha = if (faded) 0.30f else 0.75f),
-        0.24f to colors.specular.copy(alpha = 0.10f),
-        0.74f to Color.Transparent,
-        1.00f to if (faded) Color.Transparent else colors.ink.copy(alpha = 0.18f),
+        0.00f to colors.specular.copy(alpha = if (faded) 0.38f else 0.92f),
+        0.22f to colors.specular.copy(alpha = 0.16f),
+        0.72f to Color.Transparent,
+        1.00f to if (faded) Color.Transparent else colors.ink.copy(alpha = 0.16f),
     )
 
     onDrawBehind {
@@ -277,16 +290,22 @@ fun Modifier.frostedSurface(
             // double width, what survives is a full-weight line hugging the edge.
             val hard = Stroke(HomeOsDims.border.toPx() * 2f)
 
-            // Selected fills with the accent rather than hinting at it. On a field this loud a 10%
-            // wash is not a state, it is a smudge; and the ink border carries the edge regardless,
-            // so the fill is free to be emphatic.
+            // Two corrections live in these two numbers.
+            //
+            // The fill is translucent, so the field's light passes through a chip. That is what
+            // makes the glass visible on the screens with no sheet open — which is exactly where
+            // it was asked for, and where an opaque surface called glass had nothing to show.
+            //
+            // And selection is a *wash* rather than a slab. At 0.82 a chosen tile became a solid
+            // block of bright accent, which is what made a row of appliances read as sweets. The
+            // ink border carries the edge, so the fill only has to say which one.
             val base = androidx.compose.ui.graphics.lerp(
-                colors.paper,
-                accent,
-                0.82f * selection,
+                colors.paper.copy(alpha = 0.62f),
+                accent.copy(alpha = 0.92f),
+                0.46f * selection,
             )
             val sheenBrush = Brush.verticalGradient(
-                0.00f to colors.specular.copy(alpha = 0.34f),
+                0.00f to colors.specular.copy(alpha = 0.46f),
                 0.55f to Color.Transparent,
                 1.00f to colors.ink.copy(alpha = 0.05f),
             )
@@ -309,6 +328,8 @@ private fun Modifier.lift(elevation: Dp, shape: Shape) = shadow(
     elevation = elevation,
     shape = shape,
     clip = false,
-    ambientColor = Color.Black,
-    spotColor = Color.Black,
+    // Espresso rather than black, for the same reason the hard offset is: a neutral-black shadow
+    // under a warm interface greys whatever it falls on.
+    ambientColor = Color(0xFF2A1E14),
+    spotColor = Color(0xFF2A1E14),
 )

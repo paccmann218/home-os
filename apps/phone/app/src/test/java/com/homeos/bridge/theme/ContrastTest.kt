@@ -152,7 +152,7 @@ class ContrastTest {
         // composite over the worst cases and require the floor in all of them. The glass tints
         // toward cream now, so the text on it is ink rather than the near-white it used to be.
         listOf(
-            "control" to 0.74, "chrome" to 0.72, "dock" to 0.80, "sheet" to 0.86,
+            "control" to 0.58, "chrome" to 0.55, "dock" to 0.58, "sheet" to 0.72,
         ).forEach { (name, alpha) ->
             listOf(
                 "the field" to c.shell,
